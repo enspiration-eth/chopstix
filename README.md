@@ -1,5 +1,7 @@
 # CHOPSTIX
 
+**Play: https://enspiration-eth.github.io/chopstix/**
+
 **Launch it. Stage it. Catch it.** A deliberately unfair, QWOP-style rocket game for the browser.
 
 You don't fly the rocket. You fly **four keys**: two engine banks, plus a gimbal that pushes the nose each way. Lift a 121 m stainless-steel stack off the pad. Climb to the target altitude shown on screen and hot-stage the upper stage inside the release window. Then fly the booster back and set it into the launch tower's catch arms ("chopsticks") slowly enough that they close on it.
