@@ -634,7 +634,7 @@ export class Game {
         this.smoke.emit({
           x: f.x - f.ux * (tail + k * 20), y: f.y - f.uy * (tail + k * 20), z: (Math.random() - 0.5) * 6,
           vx: s.booster.vx * 0.25 + (Math.random() - 0.5) * 6, vy: s.booster.vy * 0.25 + (Math.random() - 0.5) * 6, vz: (Math.random() - 0.5) * 6,
-          life: 3 + Math.random() * 4 * dens, size0: 6, size1: 26 + 30 * (1 - dens),
+          life: s.stacked ? 3 + Math.random() * 4 * dens : 1.2 + Math.random() * 1.5, size0: 6, size1: 26 + 30 * (1 - dens),
           r: 0.88, g: 0.88, b: 0.87, alpha: (s.stacked ? 0.3 : 0.08) * dens + 0.03, drag: 0.4, heat: 0.05,
         })
       }
@@ -790,7 +790,7 @@ export class Game {
       u.uRocket.value.set(bx + ux * 35, by + uy * 35, 0)
     }
     this.smoke.uniforms.uGlowPos.value.set(bx - ux * 20, by - uy * 20, 0)
-    this.smoke.uniforms.uGlow.value = thrust * (s.stacked ? 0.6 : 0.12)
+    this.smoke.uniforms.uGlow.value = thrust * (s.stacked ? 0.6 : 0.0)
     this.sortTimer -= dt
     if (this.sortTimer <= 0) {
       this.sortTimer = 0.25
