@@ -146,7 +146,7 @@ export const createBooster = (radialSegments: number, plumeSegments: number): Bo
   plumes.mesh.position.y = -0.95
   group.add(plumes.mesh)
 
-  const engineLight = new THREE.PointLight(0xffa25a, 0, 900, 1.4)
+  const engineLight = new THREE.PointLight(0xffa25a, 0, 700, 2)
   engineLight.position.y = -14
   group.add(engineLight)
 

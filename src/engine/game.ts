@@ -738,7 +738,7 @@ export class Game {
     pu.uGimbal.value = s.gimbal
     const thrust = alive ? (s.throttleL + s.throttleR) / 2 : 0
     setBellHeat(thrust)
-    this.booster.engineLight.intensity = thrust * (s.stacked ? 2.2e6 : 9e5) * (0.85 + 0.15 * Math.random())
+    this.booster.engineLight.intensity = thrust * (s.stacked ? 1.6e4 : 7e3) * (0.85 + 0.15 * Math.random())
     this.booster.fins.forEach((fin, i) => {
       fin.rotation.x = (i < 2 ? 1 : -1) * s.fins * 0.45
     })
@@ -828,12 +828,12 @@ export class Game {
       // establishing shot of the stack on the mount, tower in frame
       const a = this.mode === 'attract' ? this.orbit : 0.38
       desired.set(Math.sin(a) * 250 * zoom + 30, 36, Math.cos(a) * 250 * zoom)
-      desiredLook.set(-6, 70 + Math.max(0, by - 20) * 0.6, 0)
+      desiredLook.set(this.mode === 'attract' ? -45 : -6, 70 + Math.max(0, by - 20) * 0.6, 0)
       k = 1.5
     } else if (s.phase === 'Caught') {
-      const a = 0.5 + this.time * 0.04
-      desired.set(Math.sin(a) * 150 * zoom, WORLD.armY - 25, Math.cos(a) * 150 * zoom)
-      desiredLook.set(-8, WORLD.armY - 10, 0)
+      const a = 0.95 + this.time * 0.03
+      desired.set(WORLD.catchX + Math.sin(a) * 175 * zoom, WORLD.armY - 30, Math.cos(a) * 175 * zoom)
+      desiredLook.set(WORLD.catchX - 6, WORLD.armY - 18, 0)
       k = 1.2
     } else if (s.phase === 'Crashed' || s.phase === 'Touchdown') {
       const o = s.outcome

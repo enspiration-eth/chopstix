@@ -89,7 +89,7 @@ export const createPlumes = (
         float v = -position.y;            // 0 at the nozzle exit, 1 at the tail
         vV = v;
         float vac = 1.0 - uDensity;
-        float len = mix(22.0, 95.0, pow(vac, 0.7)) * (0.35 + 0.65 * thr);
+        float len = mix(42.0, 120.0, pow(vac, 0.7)) * (0.35 + 0.65 * thr);
         vLen = len;
         float nozzle = ${nozzle.toFixed(3)};
         // under-expanded in thin air: the plume balloons out
@@ -137,10 +137,10 @@ export const createPlumes = (
         col += vec3(1.8, 1.7, 2.4) * diamonds * core * 1.6;
         col = mix(col, vec3(0.5, 0.45, 1.1), (1.0 - dens) * 0.65);
         float a = edge * pow(1.0 - v, mix(1.1, 2.4, 1.0 - dens)) * (0.55 + 0.45 * turb);
-        a *= mix(0.55, 0.18, 1.0 - dens);
+        a *= mix(0.9, 0.22, 1.0 - dens);
         a *= smoothstep(0.0, 0.03, v + 0.01);
         a *= vThrottle * uOpacity;
-        gl_FragColor = vec4(col * a, a);
+        gl_FragColor = vec4(col * a * 1.8, a);
       }
     `,
   })

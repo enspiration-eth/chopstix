@@ -139,8 +139,8 @@ export class Particles {
           float lit = 0.62 + 0.38 * clamp(q.y * 0.6 + 0.5 + uSunDir.y * 0.3, 0.0, 1.0);
           vec3 col = vCol * lit * (0.8 + 0.3 * n);
           float gd = length(vWorld - uGlowPos);
-          col += vec3(1.6, 0.75, 0.3) * uGlow * exp(-gd * 0.012) * (0.4 + vData.w);
-          col += vec3(2.2, 0.9, 0.3) * vData.w * (1.0 - d);
+          col += vec3(1.5, 0.8, 0.4) * uGlow * exp(-gd * 0.02) * 0.6;
+          col += vec3(2.2, 0.9, 0.3) * vData.w * vData.w * (1.0 - d);
           gl_FragColor = vec4(col, a);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>

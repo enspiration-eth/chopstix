@@ -41,7 +41,7 @@ export const createEarth = (sunDir: THREE.Vector3, segments: number) => {
         float nFine = vnoise(p * 0.05);
         // coastline runs north-south east of the pad (Gulf to +x)
         float coast = vWorld.x - 1400.0 - (n - 0.5) * 2600.0 - 900.0 * sin(vWorld.z * 0.00021);
-        vec3 marsh = mix(vec3(0.20, 0.22, 0.13), vec3(0.36, 0.31, 0.21), n2);
+        vec3 marsh = mix(vec3(0.16, 0.21, 0.09), vec3(0.40, 0.33, 0.20), n2);
         marsh = mix(marsh, vec3(0.42, 0.38, 0.30), smoothstep(0.55, 0.8, fbm(p * 0.0012 + 3.0)));
         vec3 sand = vec3(0.78, 0.70, 0.55) * (0.9 + 0.1 * nFine);
         vec3 deep = vec3(0.02, 0.09, 0.16);

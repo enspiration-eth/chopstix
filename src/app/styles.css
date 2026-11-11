@@ -137,7 +137,7 @@ html, body {
 .callout-bad { border-color: var(--bad); color: #ffd7d7; }
 @keyframes callout { 0% { opacity: 0; transform: translateY(-6px) scale(1.04); } 8% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
 
-.prompt { position: absolute; left: 50%; top: 38%; transform: translateX(-50%); font-size: clamp(14px, 1.7vw, 18px); letter-spacing: 0.25em; color: var(--dim); white-space: nowrap; }
+.prompt { position: absolute; left: 50%; top: calc(150px + var(--safe-t)); transform: translateX(-50%); font-size: clamp(14px, 1.7vw, 18px); letter-spacing: 0.25em; color: var(--dim); white-space: nowrap; }
 .prompt-hot { color: #fff; padding: 6px 14px 3px; background: rgba(255, 122, 47, 0.18); border: 1px solid rgba(255, 122, 47, 0.7); animation: pulse 0.9s ease-in-out infinite alternate; }
 @keyframes pulse { to { background: rgba(255, 122, 47, 0.36); } }
 

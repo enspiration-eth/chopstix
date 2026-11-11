@@ -30,6 +30,7 @@ await page.evaluate(() => window.__game().debugAutopilot(true))
 await page.waitForTimeout(4500)
 await page.screenshot({ path: `${prefix}02-liftoff.png` })
 
+if (process.env.QUICK) { console.log(logs.join('\n')); await browser.close(); process.exit(0) }
 await ff(40, "s.booster.y > 900")
 await page.waitForTimeout(1500)
 await page.screenshot({ path: `${prefix}03-clouds.png` })
