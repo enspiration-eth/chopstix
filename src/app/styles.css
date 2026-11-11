@@ -268,3 +268,46 @@ html, body {
   .is-touch .pad-q, .is-touch .pad-p { bottom: calc(200px + var(--safe-b)); }
   .is-touch .pad-w, .is-touch .pad-o { bottom: calc(200px + var(--safe-b) + clamp(86px, 14.5vw, 128px)); }
 }
+
+/* touch phones in landscape: thumbs own the corners, HUD squeezes into the middle */
+@media (max-height: 520px) {
+  .is-touch .pad { width: 84px; height: 84px; border-radius: 18px; }
+  .is-touch .pad-key { font-size: 26px; }
+  .is-touch .pad-label { font-size: 8px; }
+  .is-touch .pad-q, .is-touch .pad-p { bottom: calc(12px + var(--safe-b)); }
+  .is-touch .pad-w, .is-touch .pad-o { bottom: calc(12px + var(--safe-b) + 94px); }
+  .is-touch .pad-stage { top: auto; bottom: calc(64px + var(--safe-b)); transform: translateX(-50%); width: 96px; height: 52px; }
+  .is-touch .pad-stage.is-held { transform: translateX(-50%) scale(0.95); }
+  .is-touch .hud-bottom { padding-left: calc(112px + var(--safe-l)); padding-right: calc(112px + var(--safe-r)); gap: 8px; }
+  .is-touch .panel-title, .is-touch .engine-map, .is-touch .tilt { display: none; }
+  .is-touch .gauge { width: 66px; height: 66px; }
+  .is-touch .gauge-value { font-size: 17px; }
+  .is-touch .gauge-label { display: none; }
+  .is-touch .ladder { height: 52px; }
+  .is-touch .prompt { top: calc(52px + var(--safe-t)); font-size: 12px; }
+  .is-touch .catch-box { top: calc(80px + var(--safe-t)); }
+}
+
+/* short landscape screens: keep every overlay on one screen */
+@media (max-height: 520px) {
+  .overlay { gap: 10px; padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
+  .overlay-title { padding-bottom: calc(18px + var(--safe-b)); }
+  .overlay-result, .overlay-paused { overflow-y: auto; justify-content: flex-start; pointer-events: auto; touch-action: pan-y; }
+  .logo-mark { display: none; }
+  .logo-word { font-size: clamp(40px, 16vh, 72px); }
+  .logo-tag { font-size: 10px; }
+  .blurb { font-size: 12.5px; line-height: 1.4; max-width: 520px; }
+  .btn { padding-top: 10px; padding-bottom: 8px; font-size: 16px; }
+  .best { font-size: 12px; }
+  .fineprint { display: none; }
+  .result-kicker { font-size: 11px; }
+  .result-title { font-size: clamp(30px, 11vh, 48px); }
+  .result-crashed .result-title { font-size: clamp(22px, 8vh, 36px); }
+  .result-reason { font-size: 13px; }
+  .score-row { padding: 4px 4px 3px; }
+  .score-label { font-size: 11px; }
+  .score-detail { font-size: 10px; }
+  .score-pts { font-size: 15px; }
+  .score-total { padding-top: 6px; }
+  .score-total strong { font-size: 28px; }
+}

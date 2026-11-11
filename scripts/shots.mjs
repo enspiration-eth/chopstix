@@ -26,7 +26,7 @@ const ff = async (sec, cond) =>
 
 await page.click('button:has-text("LAUNCH")')
 await page.waitForTimeout(400)
-await page.evaluate(() => window.__game().debugAutopilot(true))
+await page.evaluate(() => { const g = window.__game(); g.startMission(7); g.debugAutopilot(true) })
 await page.waitForTimeout(4500)
 await page.screenshot({ path: `${prefix}02-liftoff.png` })
 
