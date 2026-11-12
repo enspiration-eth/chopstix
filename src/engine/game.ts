@@ -7,6 +7,7 @@ import {
   airDensity,
   autopilot,
   basePoint,
+  guidance,
   initialState,
   score,
   step,
@@ -16,6 +17,7 @@ import {
 import type { Outcome, ScoreBreakdown, SimEvent, SimState, Telemetry } from '../sim'
 import { Audio } from './audio'
 import { createCloudDeck, createCloudPuffs } from './clouds'
+import { type CloudNoise, createCloudNoise, deckDensityAt } from './cloudNoise'
 import { createEarth } from './earth'
 import { buildEnvMap } from './envmap'
 import { Input } from './input'
@@ -35,6 +37,17 @@ export interface LiveTelemetry extends Telemetry {
   readonly fps: number
   readonly inWindow: boolean
   readonly catchH: number
+  /** descent guidance (only meaningful for the returning booster) */
+  readonly guide: GuideTelemetry | null
+}
+
+export interface GuideTelemetry {
+  readonly impactDx: number
+  readonly impactT: number
+  readonly stopAlt: number
+  readonly burning: boolean
+  readonly path: ReadonlyArray<number>
+  readonly track: ReadonlyArray<number>
 }
 
 export interface MissionResult {
@@ -88,6 +101,10 @@ export class Game {
   private readonly sky
   private readonly earth
   private readonly puffs
+  private readonly cloudNoise: CloudNoise
+  private track: number[] = []
+  private trackTimer = 0
+  private cloudFog = 0
   private readonly deck
   private readonly site
   private readonly booster
@@ -163,14 +180,15 @@ export class Game {
 
     this.sky = createSky(SUN)
     this.scene.add(this.sky.mesh)
-    this.earth = createEarth(SUN, mobile ? 160 : 256)
+    this.cloudNoise = createCloudNoise()
+    this.earth = createEarth(SUN, mobile ? 160 : 256, this.cloudNoise.texture)
     this.scene.add(this.earth.mesh)
-    this.puffs = createCloudPuffs(SUN, TIERS[2]!.clouds, 3)
-    this.puffs.mesh.geometry instanceof THREE.InstancedBufferGeometry &&
-      (this.puffs.mesh.geometry.instanceCount = tier.clouds)
+    this.puffs = createCloudPuffs(SUN, this.cloudNoise.texture, TIERS[2]!.clouds, 3)
+    this.puffs.setCount(tier.clouds)
     this.scene.add(this.puffs.mesh)
-    this.deck = createCloudDeck(SUN, 2700)
-    this.scene.add(this.deck.mesh)
+    this.puffs.clusters.slice(0, this.earth.uniforms.uCumulus.value.length).forEach((c, i) => this.earth.uniforms.uCumulus.value[i]!.set(c.x, c.z, c.r, 1))
+    this.deck = createCloudDeck(SUN, this.cloudNoise.texture, TIERS[2]!.deckSteps)
+    this.scene.add(this.deck.group)
     this.holes = this.puffs.uniforms.uHoles.value
     this.deck.uniforms.uHoles.value = this.holes
 
@@ -338,6 +356,8 @@ export class Game {
   // ---------------------------------------------------------------- internals
 
   private reset(seed: number) {
+    this.track = []
+    this.trackTimer = 0
     this.state = initialState(seed)
     this.prev = this.state
     this.acc = 0
@@ -402,8 +422,8 @@ export class Game {
     this.post.enabled = tier.bloom
     this.smoke.budget = tier.smoke
     this.fire.budget = tier.fire
-    const g = this.puffs.mesh.geometry as THREE.InstancedBufferGeometry
-    g.instanceCount = tier.clouds
+    this.puffs.setCount(tier.clouds)
+    this.earth.uniforms.uShadow.value = tier.cloudShadows ? 1 : 0
     this.resize()
   }
 
@@ -414,7 +434,8 @@ export class Game {
     const dtReal = Math.min(0.1, frameMs / 1000)
     this.last = now
     if (document.hidden) return
-    if (this.governor.sample(frameMs, dtReal)) this.applyTier()
+    // wall-clock time (not the clamped sim step) so a very slow device still steps down within seconds
+    if (this.governor.sample(frameMs, Math.min(0.5, frameMs / 1000))) this.applyTier()
 
     if (!this.paused) this.simulate(dtReal)
     this.render(dtReal)
@@ -442,6 +463,16 @@ export class Game {
     }
     if (steps >= 48) this.acc = 0
     this.derivedCallouts()
+    // breadcrumb trail of the returning booster for the guidance map
+    if (!this.state.stacked && this.state.phase === 'Return') {
+      this.trackTimer -= dt
+      if (this.trackTimer <= 0) {
+        this.trackTimer = 0.5
+        const bp = basePoint(this.state)
+        this.track.push(bp.x - WORLD.catchX, Math.max(0, bp.y))
+        if (this.track.length > 80) this.track.splice(0, 2)
+      }
+    }
     this.updateEffects(dt)
 
     if (this.endTimer > 0) {
@@ -462,6 +493,8 @@ export class Game {
       this.telemetryTimer = 0.05
       const t = telemetry(this.state)
       const pins = this.pinsHeight()
+      const returning = !this.state.stacked && this.state.phase === 'Return'
+      const g = returning ? guidance(this.state) : null
       this.cb.onTelemetry({
         ...t,
         warp: this.warp,
@@ -469,6 +502,7 @@ export class Game {
         fps: 1000 / this.governor.frameMs,
         inWindow: this.state.stacked && Math.abs(t.altitude - this.state.targetAlt) <= MISSION.releaseWindow,
         catchH: pins,
+        guide: g ? { ...g, track: this.track.slice() } : null,
       })
     }
   }
@@ -706,19 +740,23 @@ export class Game {
       }
     }
     // cloud punch-through holes
-    const layer = f.y > 750 && f.y < 1650 ? 0 : f.y > 2550 && f.y < 2850 ? 1 : -1
+    const layer = f.y > 750 && f.y < 1650 ? 0 : f.y > 2620 && f.y < 3000 ? 1 : -1
     if (layer >= 0 && layer !== this.lastHoleLayer && alive) {
       const h = this.holes[this.holeCursor % this.holes.length]!
       h.set(f.x, 0, 90, 1)
       this.holeCursor++
-      for (let i = 0; i < 30; i++) {
-        const a = Math.random() * Math.PI * 2
+      // punch-through: a ring of cloud shoved outward, plus a jolt
+      const ring = layer === 1 ? 64 : 30
+      for (let i = 0; i < ring; i++) {
+        const a = (i / ring) * Math.PI * 2 + Math.random() * 0.2
+        const sp = (layer === 1 ? 70 : 40) * (0.7 + Math.random() * 0.6)
         this.smoke.emit({
-          x: f.x + Math.cos(a) * 20, y: f.y, z: Math.sin(a) * 20,
-          vx: Math.cos(a) * 40, vy: (Math.random() - 0.5) * 10, vz: Math.sin(a) * 40,
-          life: 4, size0: 20, size1: 70, r: 1, g: 1, b: 1, alpha: 0.5, drag: 0.8,
+          x: f.x + Math.cos(a) * 24, y: f.y + (Math.random() - 0.5) * 20, z: Math.sin(a) * 24,
+          vx: Math.cos(a) * sp + s.booster.vx * 0.2, vy: s.booster.vy * 0.15 + (Math.random() - 0.5) * 12, vz: Math.sin(a) * sp,
+          life: 4 + Math.random() * 2, size0: 24, size1: layer === 1 ? 110 : 70, r: 1, g: 1, b: 1, alpha: 0.55, drag: 0.7,
         })
       }
+      if (layer === 1) this.shake = Math.max(this.shake, 0.35)
     }
     if (layer >= 0) this.lastHoleLayer = layer
     else if (f.y < 700 || (f.y > 1700 && f.y < 2500)) this.lastHoleLayer = -1
@@ -855,7 +893,16 @@ export class Game {
       u.uCamPos.value.copy(this.camera.position)
       u.uTime.value = this.time
       u.uRocket.value.set(bx + ux * 35, by + uy * 35, 0)
+      u.uGlowPos.value.set(bx - ux * 25, by - uy * 25, 0)
+      u.uGlow.value = thrust * (s.stacked ? 1 : 0.6)
     }
+    // deck slices follow the camera; draw order flips when we are above the deck
+    const aboveDeck = camAlt > 2800
+    this.puffs.mesh.renderOrder = aboveDeck ? 3 : 5
+    this.deck.update(this.camera.position, TIERS[this.governor.tier]!.deckSteps, 4)
+    // camera inside the deck: white-out, faded in/out quickly (the punch-through moment)
+    const inCloud = deckDensityAt(this.cloudNoise, this.camera.position.x, camAlt, this.camera.position.z)
+    this.cloudFog += (inCloud - this.cloudFog) * (1 - Math.exp(-dt * 10))
     this.smoke.uniforms.uGlowPos.value.set(bx - ux * 20, by - uy * 20, 0)
     this.smoke.uniforms.uGlow.value = thrust * (s.stacked ? 0.6 : 0.0)
     this.sortTimer -= dt
@@ -872,6 +919,7 @@ export class Game {
       const film = this.post.film.uniforms as Record<string, THREE.IUniform>
       film['uTime']!.value = this.time
       film['uFlash']!.value = this.flash * 0.35
+      film['uCloud']!.value = Math.min(0.9, this.cloudFog * 0.95)
       this.post.bloom.strength = 0.55 + thrust * 0.25 + this.flash
       this.post.render(dt)
     } else {

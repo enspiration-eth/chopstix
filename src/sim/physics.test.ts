@@ -131,3 +131,32 @@ describe('autopilot (proves the mission is flyable with only Q/W/O/P/SPACE)', ()
     for (const s of results) expect(s.release).not.toBeNull()
   })
 })
+
+describe('descent guidance', () => {
+  it('predicts a coast that lands where the engines-off sim lands', async () => {
+    const { guidance, CATCH_BASE_Y } = await import('./index')
+    const s0: SimState = { ...fallingBoosterAt(1500, -120, 400), booster: { ...fallingBoosterAt(1500, -120, 400).booster, vx: -25 } }
+    const g = guidance(s0)
+    let s = s0
+    while (basePoint(s).y > CATCH_BASE_Y && s.phase === 'Return') s = step(s, NO_CONTROLS).state
+    const real = basePoint(s).x - WORLD.catchX
+    expect(Math.abs(g.impactDx - real)).toBeLessThan(25)
+    expect(g.impactT).toBeGreaterThan(3)
+    expect(g.path.length).toBeGreaterThan(4)
+    expect(g.stopAlt).toBeGreaterThan(0)
+    expect(g.burning).toBe(false)
+  })
+
+  it('switches to a braking prediction inside the stopping distance', async () => {
+    const { guidance } = await import('./index')
+    const s0 = fallingBoosterAt(300, -90, 20)
+    const g = guidance(s0)
+    expect(g.burning).toBe(true)
+    expect(g.impactT).toBeGreaterThan(300 / 90)
+    // the braking distance matches the real sim burning both banks flat out (spool-up makes it a bit longer)
+    let s = s0
+    for (let i = 0; i < 120 * 30 && s.booster.vy < 0 && s.phase === 'Return'; i++) s = step(s, both).state
+    const lost = basePoint(s0).y - basePoint(s).y
+    expect(Math.abs(g.stopAlt - lost) / lost).toBeLessThan(0.2)
+  })
+})

@@ -1,6 +1,6 @@
 // Touch-emulated check that every dismissible overlay scrolls inside its panel and can be closed.
 import { chromium } from 'playwright'
-const url = process.env.URL ?? 'http://localhost:4173/?debug'
+const url = process.env.URL ?? 'http://localhost:4173/?debug&tier=low' // layout checks: the cheapest tier keeps SwiftShader fast
 const sizes = [['landscape', 852, 393], ['portrait', 393, 852]]
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 let failed = false

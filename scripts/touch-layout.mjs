@@ -1,11 +1,11 @@
 // Checks the touch pads never cover HUD elements and that everything stays on screen.
 import { chromium } from 'playwright'
-const url = process.env.URL ?? 'http://localhost:4173/?debug'
+const url = process.env.URL ?? 'http://localhost:4173/?debug&tier=low' // layout checks: the cheapest tier keeps SwiftShader fast
 const sizes = [['landscape', 852, 393], ['portrait', 393, 852]]
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
 let failed = false
 const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (!ok) failed = true }
-const HUD = '.hud-top, .hud-top > *, .panel-left .gauge, .panel-left .fuel, .panel-left .tilt, .panel-right .ladder, .panel-right .readout, .timeline-clock, .timeline-track, .callouts > *, .catch-box, .prompt, .corner-buttons'
+const HUD = '.hud-top, .hud-top > *, .panel-left .gauge, .panel-left .fuel, .panel-left .tilt, .panel-right .ladder, .panel-right .readout, .timeline-clock, .timeline-track, .callouts > *, .catch-box, .guide-col, .prompt, .corner-buttons'
 const measure = page => page.evaluate(hud => {
   const vis = el => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' }
   const rect = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, name: el.className } }

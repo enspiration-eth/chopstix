@@ -2,6 +2,7 @@ import type { Html, HtmlBuilder } from 'foldkit/html'
 import type { Model, Message } from './main'
 import { formatMet } from './main'
 import type { Telemetry } from './domain'
+import { guideView } from './guide'
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
@@ -170,15 +171,25 @@ export const hudView = (model: Model, h: HtmlBuilder<Message>): Html => {
       ...(t.phase === 'Pad'
         ? [h.div([h.Class('prompt prompt-hot')], [model.touch ? 'HOLD Q + P TO LIGHT BOTH BANKS' : 'HOLD  Q + P  TO LIGHT BOTH BANKS'])]
         : []),
-      ...(!t.stacked && t.phase === 'Return' && t.catchH < 900
+      ...(t.guide && !t.stacked && t.phase === 'Return'
         ? [
             h.div(
-              [h.Class('catch-box')],
+              [h.Class(`guide-col ${t.catchH < 900 ? 'has-catch' : ''}`)],
               [
-                readout(h, 'TOWER Δ', `${t.towerDx >= 0 ? '+' : ''}${t.towerDx.toFixed(1)} m`, Math.abs(t.towerDx) < 5 ? 'ok' : 'warn'),
-                readout(h, 'SINK', `${(-t.vSpeed).toFixed(1)} m/s`, -t.vSpeed < 8 ? 'ok' : 'warn'),
-                readout(h, 'DRIFT', `${t.hSpeed.toFixed(1)} m/s`, Math.abs(t.hSpeed) < 4 ? 'ok' : 'warn'),
-                readout(h, 'ARMS', `${Math.max(0, t.catchH).toFixed(0)} m`, ''),
+                guideView(h, t, model.touch),
+                ...(t.catchH < 900
+                  ? [
+                      h.div(
+                        [h.Class('catch-box')],
+                        [
+                          readout(h, 'TOWER Δ', `${t.towerDx >= 0 ? '+' : ''}${t.towerDx.toFixed(1)} m`, Math.abs(t.towerDx) < 5 ? 'ok' : 'warn'),
+                          readout(h, 'SINK', `${(-t.vSpeed).toFixed(1)} m/s`, -t.vSpeed < 8 ? 'ok' : 'warn'),
+                          readout(h, 'DRIFT', `${t.hSpeed.toFixed(1)} m/s`, Math.abs(t.hSpeed) < 4 ? 'ok' : 'warn'),
+                          readout(h, 'ARMS', `${Math.max(0, t.catchH).toFixed(0)} m`, ''),
+                        ],
+                      ),
+                    ]
+                  : []),
               ],
             ),
           ]

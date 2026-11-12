@@ -28,6 +28,16 @@ export const Telemetry = Schema.Struct({
   fps: Schema.Number,
   inWindow: Schema.Boolean,
   catchH: Schema.Number,
+  guide: Schema.NullOr(
+    Schema.Struct({
+      impactDx: Schema.Number,
+      impactT: Schema.Number,
+      stopAlt: Schema.Number,
+      burning: Schema.Boolean,
+      path: Schema.Array(Schema.Number),
+      track: Schema.Array(Schema.Number),
+    }),
+  ),
 })
 export type Telemetry = typeof Telemetry.Type
 
@@ -54,6 +64,7 @@ export const emptyTelemetry: Telemetry = {
   fps: 60,
   inWindow: false,
   catchH: 0,
+  guide: null,
 }
 
 export const Tone = Schema.Literals(['info', 'good', 'bad'])

@@ -1,15 +1,21 @@
 import * as THREE from 'three'
+import { DECK } from './cloudNoise'
 import { NOISE, SKY } from './glsl'
+
+export const MAX_CLOUD_SHADOWS = 16
 
 export const EARTH_RADIUS = 400_000
 
-export const createEarth = (sunDir: THREE.Vector3, segments: number) => {
+export const createEarth = (sunDir: THREE.Vector3, segments: number, cloudTex: THREE.Texture) => {
   const uniforms = {
     uSunDir: { value: sunDir },
     uAltitude: { value: 0 },
     uCamPos: { value: new THREE.Vector3() },
     uTime: { value: 0 },
     uScorch: { value: 0 },
+    uCloudTex: { value: cloudTex },
+    uShadow: { value: 1 },
+    uCumulus: { value: Array.from({ length: MAX_CLOUD_SHADOWS }, () => new THREE.Vector4(0, 0, 0, 0)) },
   }
   const geo = new THREE.SphereGeometry(EARTH_RADIUS, segments, segments / 2, 0, Math.PI * 2, 0, 0.5)
   geo.translate(0, -EARTH_RADIUS, 0)
@@ -31,6 +37,25 @@ export const createEarth = (sunDir: THREE.Vector3, segments: number) => {
       uniform vec3 uCamPos;
       uniform float uTime;
       uniform float uScorch;
+      uniform sampler2D uCloudTex;
+      uniform float uShadow;
+      uniform vec4 uCumulus[${MAX_CLOUD_SHADOWS}];
+      // soft shadows of the deck and the cumulus, projected along the sun
+      float cloudShadow(vec2 p, vec3 L) {
+        if (uShadow < 0.5) return 1.0;
+        float ly = max(L.y, 0.12);
+        vec2 d1 = p + L.xz / ly * ${(DECK.base + 150).toFixed(1)};
+        float a = texture2D(uCloudTex, d1 / ${DECK.coverScale.toFixed(1)}).r;
+        float b = texture2D(uCloudTex, d1 / ${DECK.billowScale.toFixed(1)} + 0.37).g;
+        float deck = smoothstep(0.42, 0.64, a * 0.62 + b * 0.38);
+        vec2 d2 = p + L.xz / ly * 1000.0;
+        float cu = 0.0;
+        for (int i = 0; i < ${MAX_CLOUD_SHADOWS}; i++) {
+          vec4 c = uCumulus[i];
+          if (c.z > 0.0) cu = max(cu, 1.0 - smoothstep(c.z * 0.35, c.z * 1.05, length(d2 - c.xy)));
+        }
+        return (1.0 - 0.5 * deck) * (1.0 - 0.42 * cu);
+      }
       varying vec3 vWorld;
       varying vec3 vNormal;
       void main() {
@@ -64,14 +89,14 @@ export const createEarth = (sunDir: THREE.Vector3, segments: number) => {
 
         vec3 N = normalize(vNormal);
         vec3 L = normalize(uSunDir);
-        float diff = max(dot(N, L), 0.0);
+        float diff = max(dot(N, L), 0.0) * cloudShadow(p, L);
         vec3 V = normalize(uCamPos - vWorld);
         vec3 col = albedo * (diff * vec3(1.25, 1.12, 0.98) + vec3(0.22, 0.27, 0.36));
         // ocean glint
         vec3 H = normalize(L + V);
         float wave = vnoise(p * 0.02 + uTime * 0.2) * 0.5 + vnoise(p * 0.07 - uTime * 0.3) * 0.5;
         float spec = pow(max(dot(N, H), 0.0), 220.0 + wave * 200.0) * water;
-        col += vec3(1.0, 0.85, 0.65) * spec * 3.5;
+        col += vec3(1.0, 0.85, 0.65) * spec * 3.5 * cloudShadow(p, L);
 
         // aerial perspective toward the shared sky model
         float dist = length(uCamPos - vWorld);

@@ -12,6 +12,7 @@ const FilmShader = {
     uVignette: { value: 1 },
     uAberration: { value: 0.0015 },
     uFlash: { value: 0 },
+    uCloud: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -23,6 +24,7 @@ const FilmShader = {
     uniform float uVignette;
     uniform float uAberration;
     uniform float uFlash;
+    uniform float uCloud;
     varying vec2 vUv;
     float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
@@ -35,6 +37,9 @@ const FilmShader = {
       col.b = texture2D(tDiffuse, vUv - off).b;
       col *= mix(1.0, (1.0 - smoothstep(0.2, 0.85, r2 * 1.6)), 0.55 * uVignette);
       col += (h(vUv * 800.0 + uTime) - 0.5) * 0.025;
+      // inside a cloud: milky white-out with a little moving texture
+      float cn = (0.5 + 0.5 * sin(vUv.x * 7.0 + uTime * 1.3 + sin(vUv.y * 5.0 - uTime))) * 0.05;
+      col = mix(col, vec3(0.84, 0.87, 0.92) + cn, clamp(uCloud, 0.0, 1.0) * (0.75 + 0.25 * smoothstep(0.0, 0.5, r2)));
       col = mix(col, vec3(1.0, 0.96, 0.9), clamp(uFlash, 0.0, 1.0));
       gl_FragColor = vec4(col, 1.0);
     }

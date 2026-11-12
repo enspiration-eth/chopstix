@@ -6,12 +6,15 @@ export interface QualityTier {
   readonly clouds: number
   readonly smoke: number
   readonly fire: number
+  /** ray-march steps through the cloud deck */
+  readonly deckSteps: number
+  readonly cloudShadows: boolean
 }
 
 export const TIERS: ReadonlyArray<QualityTier> = [
-  { name: 'LOW', maxDpr: 1, bloom: false, bloomScale: 0.5, clouds: 60, smoke: 500, fire: 400 },
-  { name: 'MEDIUM', maxDpr: 1.5, bloom: true, bloomScale: 0.5, clouds: 120, smoke: 1100, fire: 900 },
-  { name: 'HIGH', maxDpr: 2, bloom: true, bloomScale: 1, clouds: 190, smoke: 1800, fire: 1400 },
+  { name: 'LOW', maxDpr: 1, bloom: false, bloomScale: 0.5, clouds: 60, smoke: 500, fire: 400, deckSteps: 4, cloudShadows: false },
+  { name: 'MEDIUM', maxDpr: 1.5, bloom: true, bloomScale: 0.5, clouds: 120, smoke: 1100, fire: 900, deckSteps: 6, cloudShadows: true },
+  { name: 'HIGH', maxDpr: 2, bloom: true, bloomScale: 1, clouds: 190, smoke: 1800, fire: 1400, deckSteps: 10, cloudShadows: true },
 ]
 
 export const isMobile = () =>
