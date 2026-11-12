@@ -583,7 +583,7 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => {
         h.div([h.Class('stage'), h.OnMount(MountGame())], []),
         h.div([h.Class('scrim')], []),
         ...(flying ? [hudView(model, h)] : []),
-        ...(model.screen === 'Playing' && model.touch ? [touchPadsView(model, h)] : []),
+        ...(model.screen === 'Playing' ? [touchPadsView(model, h)] : []),
         ...(model.screen === 'Booting'
           ? [
               h.div(

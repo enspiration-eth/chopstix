@@ -114,7 +114,7 @@ export const createCloudPuffs = (sunDir: THREE.Vector3, count: number, seed = 1)
         vec2 q = vUv * 2.0 - 1.0;
         float n = fbm3(q * 2.2 + vSeed * 17.0 + uTime * 0.015);
         float r = length(q) + (n - 0.5) * 0.75;
-        float dens = smoothstep(1.0, 0.25, r);
+        float dens = (1.0 - smoothstep(0.25, 1.0, r));
         if (dens < 0.01) discard;
         // fake sphere normal for lighting
         vec3 nrm = normalize(vec3(q, sqrt(max(0.0, 1.0 - dot(q, q)))));

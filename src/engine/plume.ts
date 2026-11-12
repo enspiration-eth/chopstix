@@ -86,9 +86,9 @@ export const createPlumes = (
         float thr = (aEngine.x < 0.0 ? uThrottleL : uThrottleR) * lit;
         vThrottle = thr;
         vSeed = aEngine.w;
-        float v = -position.y;            // 0 at the nozzle exit, 1 at the tail
+        float v = clamp(-position.y, 0.0, 1.0); // 0 at the nozzle exit, 1 at the tail
         vV = v;
-        float vac = 1.0 - uDensity;
+        float vac = clamp(1.0 - uDensity, 0.0, 1.0);
         float len = mix(42.0, 120.0, pow(vac, 0.7)) * (0.35 + 0.65 * thr);
         vLen = len;
         float nozzle = ${nozzle.toFixed(3)};
@@ -103,8 +103,10 @@ export const createPlumes = (
         p.x += aEngine.x;
         p.z += aEngine.y;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        vec3 n = normalize(normalMatrix * vec3(normal.x, 0.0, normal.z));
-        vFacing = abs(dot(n, normalize(-mv.xyz)));
+        vec3 nn = normalMatrix * vec3(normal.x, 0.0, normal.z);
+        vec3 n = nn / max(length(nn), 1e-4);
+        vec3 toCam = -mv.xyz / max(length(mv.xyz), 1e-4);
+        vFacing = clamp(abs(dot(n, toCam)), 0.0, 1.0);
         gl_Position = projectionMatrix * mv;
       }
     `,
@@ -120,14 +122,17 @@ export const createPlumes = (
       varying float vLen;
       void main() {
         if (vThrottle < 0.01) discard;
-        float v = vV;
-        float dens = uDensity;
+        // every pow() base below is clamped: pow(negative, y) is NaN on some GPUs, and a single NaN
+        // pixel gets smeared over the whole frame by the bloom pass
+        float v = clamp(vV, 0.0, 1.0);
+        float dens = clamp(uDensity, 0.0, 1.0);
+        float facing = clamp(vFacing, 0.0, 1.0);
         // Mach diamonds: periodic bright knots, sharp at sea level, washed out as the air thins
         float spacing = mix(3.6, 9.0, 1.0 - dens);
         float phase = v * vLen / spacing;
-        float diamonds = pow(0.5 + 0.5 * cos(phase * 6.2831), 10.0) * smoothstep(0.75, 0.1, v) * dens;
-        float core = pow(vFacing, 2.0);
-        float edge = pow(vFacing, 0.8);
+        float diamonds = pow(clamp(0.5 + 0.5 * cos(phase * 6.2831), 0.0, 1.0), 10.0) * (1.0 - smoothstep(0.1, 0.75, v)) * dens;
+        float core = facing * facing;
+        float edge = pow(facing, 0.8);
         float turb = vnoise(vec2(v * 14.0 - uTime * 32.0, vSeed * 30.0 + uTime * 5.0));
         vec3 hot = vec3(1.6, 1.45, 1.9);
         vec3 blue = vec3(0.45, 0.42, 1.55);
@@ -136,11 +141,12 @@ export const createPlumes = (
         col = mix(col, orange, smoothstep(0.15, 0.7, v) * (0.35 + 0.65 * dens));
         col += vec3(1.8, 1.7, 2.4) * diamonds * core * 1.6;
         col = mix(col, vec3(0.5, 0.45, 1.1), (1.0 - dens) * 0.65);
-        float a = edge * pow(1.0 - v, mix(1.1, 2.4, 1.0 - dens)) * (0.55 + 0.45 * turb);
+        float a = edge * pow(max(1.0 - v, 0.0), mix(1.1, 2.4, 1.0 - dens)) * (0.55 + 0.45 * turb);
         a *= mix(0.9, 0.22, 1.0 - dens);
         a *= smoothstep(0.0, 0.03, v + 0.01);
         a *= vThrottle * uOpacity;
-        gl_FragColor = vec4(col * a * 1.8, a);
+        a = clamp(a, 0.0, 1.0);
+        gl_FragColor = vec4(min(col * a * 1.8, vec3(24.0)), a);
       }
     `,
   })
@@ -174,7 +180,7 @@ export const createGlow = (color: THREE.Color, size: number) => {
       void main() {
         float d = length(vUv * 2.0 - 1.0);
         float g = exp(-d * d * 5.0) + 0.25 * exp(-d * 2.2);
-        g *= smoothstep(1.0, 0.7, d);
+        g *= (1.0 - smoothstep(0.7, 1.0, d));
         gl_FragColor = vec4(uColor * g * uIntensity, g * uIntensity);
       }
     `,

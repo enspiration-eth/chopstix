@@ -71,7 +71,8 @@ vec3 skyColor(vec3 dir, float alt) {
   vec3 horizon = mix(vec3(0.6, 0.7, 0.84), vec3(0.32, 0.55, 0.95), space * 0.85);
   float sunUp = clamp(uSunDir.y * 3.0, 0.0, 1.0);
   // golden-hour tint on the horizon toward the sun
-  float toward = max(dot(normalize(vec3(dir.x, 0.0, dir.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0);
+  vec2 flat2 = dir.xz / max(length(dir.xz), 1e-4);
+  float toward = max(dot(flat2, normalize(uSunDir.xz)), 0.0);
   vec3 warm = vec3(1.0, 0.62, 0.36);
   horizon = mix(horizon, warm, pow(toward, 2.0) * 0.7 * (1.0 - space * 0.6));
   float bandWidth = mix(4.0, 22.0, space);

@@ -22,7 +22,7 @@ import { Input } from './input'
 import { Particles } from './particles'
 import { createGlow } from './plume'
 import { Post } from './post'
-import { QualityGovernor, TIERS, isMobile } from './quality'
+import { QualityGovernor, TIERS, isMobile, pinnedTier } from './quality'
 import { createBooster, createShip, setBellHeat } from './rocket'
 import { createSky } from './sky'
 import { createLaunchSite } from './tower'
@@ -135,7 +135,8 @@ export class Game {
     this.container = container
     this.cb = cb
     const mobile = isMobile()
-    this.governor = new QualityGovernor(mobile ? 1 : 2)
+    const pin = pinnedTier()
+    this.governor = new QualityGovernor(pin ?? (mobile ? 1 : 2), pin !== null)
     const tier = TIERS[this.governor.tier]!
 
     this.renderer = new THREE.WebGLRenderer({
@@ -270,6 +271,52 @@ export class Game {
 
   debugState() {
     return this.state
+  }
+
+  private nanProbe: THREE.Mesh | null = null
+
+  /** Debug: draw a small quad that outputs NaN/Inf, and optionally bypass the sanitize pass. */
+  debugInjectNaN(on: boolean, sanitize = true) {
+    this.post.sanitize.enabled = sanitize
+    if (on && !this.nanProbe) {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { uZero: { value: 0 } },
+        vertexShader: 'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform float uZero; void main() { float n = uZero / uZero; float i = 1.0 / uZero; gl_FragColor = vec4(n, i, n, 1.0); }',
+        depthTest: false,
+      })
+      this.nanProbe = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.02), mat)
+      this.nanProbe.position.set(0, 0, -1)
+      this.nanProbe.renderOrder = 999
+      this.camera.add(this.nanProbe)
+      if (!this.camera.parent) this.scene.add(this.camera)
+    } else if (!on && this.nanProbe) {
+      this.camera.remove(this.nanProbe)
+      this.nanProbe = null
+    }
+  }
+
+  /** Renders the scene into a float32 target and reports HDR extremes (half-float overflows at 65504). */
+  debugHdrProbe(w = 320, h = 200) {
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.FloatType })
+    this.renderer.setRenderTarget(rt)
+    this.renderer.render(this.scene, this.camera)
+    this.renderer.setRenderTarget(null)
+    const px = new Float32Array(w * h * 4)
+    this.renderer.readRenderTargetPixels(rt, 0, 0, w, h, px)
+    rt.dispose()
+    let max = 0, nan = 0, inf = 0, over = 0, at = -1
+    for (let i = 0; i < px.length; i++) {
+      if ((i & 3) === 3) continue
+      const v = px[i]!
+      if (Number.isNaN(v)) nan++
+      else if (!Number.isFinite(v)) inf++
+      else {
+        if (v > 65504) over++
+        if (v > max) { max = v; at = i >> 2 }
+      }
+    }
+    return { max, nan, inf, over, at: at < 0 ? null : [at % w, Math.floor(at / w)] }
   }
 
   get qualityName() {

@@ -35,7 +35,7 @@ export const createSky = (sunDir: THREE.Vector3) => {
           float star = hash13(cell);
           float tw = 0.75 + 0.25 * sin(uTime * 3.0 + star * 50.0);
           vec3 f = fract(d) - 0.5;
-          float s = smoothstep(0.08, 0.0, length(f)) * step(0.9965, star) * tw;
+          float s = (1.0 - smoothstep(0.0, 0.08, length(f))) * step(0.9965, star) * tw;
           col += vec3(s) * space * 1.6 * smoothstep(-0.05, 0.1, dir.y);
         }
         // sun disc (HDR so bloom picks it up)

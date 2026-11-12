@@ -33,10 +33,36 @@ const FilmShader = {
       col.r = texture2D(tDiffuse, vUv + off).r;
       col.g = texture2D(tDiffuse, vUv).g;
       col.b = texture2D(tDiffuse, vUv - off).b;
-      col *= mix(1.0, smoothstep(0.85, 0.2, r2 * 1.6), 0.55 * uVignette);
+      col *= mix(1.0, (1.0 - smoothstep(0.2, 0.85, r2 * 1.6)), 0.55 * uVignette);
       col += (h(vUv * 800.0 + uTime) - 0.5) * 0.025;
       col = mix(col, vec3(1.0, 0.96, 0.9), clamp(uFlash, 0.0, 1.0));
       gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+}
+
+/**
+ * Runs right after the scene render, before bloom. Replaces NaN/Inf with black and clamps HDR so one
+ * bad fragment (a driver's NaN, a half-float overflow) can't be blurred by the bloom mip chain into
+ * a fully black frame. Uses the bit pattern instead of x != x, which fast-math compilers drop.
+ */
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null as THREE.Texture | null }, uMax: { value: 32 } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float uMax;
+    varying vec2 vUv;
+    float clean(float x) {
+      // exponent bits all set => Inf or NaN
+      return (floatBitsToUint(x) & 0x7f800000u) == 0x7f800000u ? 0.0 : clamp(x, 0.0, uMax);
+    }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(clean(c.r), clean(c.g), clean(c.b), 1.0);
     }
   `,
 }
@@ -45,6 +71,7 @@ export class Post {
   readonly composer: EffectComposer
   readonly bloom: UnrealBloomPass
   readonly film: ShaderPass
+  readonly sanitize: ShaderPass
   private readonly renderer: THREE.WebGLRenderer
   enabled = true
 
@@ -54,6 +81,8 @@ export class Post {
     const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples })
     this.composer = new EffectComposer(renderer, target)
     this.composer.addPass(new RenderPass(scene, camera))
+    this.sanitize = new ShaderPass(SanitizeShader)
+    this.composer.addPass(this.sanitize)
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.7, 0.55, 0.92)
     this.composer.addPass(this.bloom)
     this.composer.addPass(new OutputPass())

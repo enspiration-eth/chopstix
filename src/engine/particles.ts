@@ -117,9 +117,9 @@ export class Particles {
           vec2 q = vUv * 2.0 - 1.0;
           float n = vnoise(q * 3.0 + vData.z * 40.0);
           float d = length(q) + (n - 0.5) * 0.5;
-          float a = smoothstep(1.0, 0.0, d) * vData.y;
+          float a = (1.0 - smoothstep(0.0, 1.0, d)) * vData.y;
           if (a < 0.003) discard;
-          gl_FragColor = vec4(vCol * a, a);
+          gl_FragColor = vec4(clamp(vCol * a, 0.0, 24.0), clamp(a, 0.0, 1.0));
         }`
         : /* glsl */ `
         ${NOISE}
@@ -134,14 +134,14 @@ export class Particles {
           vec2 q = vUv * 2.0 - 1.0;
           float n = fbm3(q * 2.4 + vData.z * 37.0);
           float d = length(q) + (n - 0.5) * 0.7;
-          float a = smoothstep(1.0, 0.15, d) * vData.y;
+          float a = (1.0 - smoothstep(0.15, 1.0, d)) * vData.y;
           if (a < 0.004) discard;
           float lit = 0.62 + 0.38 * clamp(q.y * 0.6 + 0.5 + uSunDir.y * 0.3, 0.0, 1.0);
           vec3 col = vCol * lit * (0.8 + 0.3 * n);
           float gd = length(vWorld - uGlowPos);
           col += vec3(1.5, 0.8, 0.4) * uGlow * exp(-gd * 0.02) * 0.6;
           col += vec3(2.2, 0.9, 0.3) * vData.w * vData.w * (1.0 - d);
-          gl_FragColor = vec4(col, a);
+          gl_FragColor = vec4(clamp(col, 0.0, 24.0), clamp(a, 0.0, 1.0));
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,

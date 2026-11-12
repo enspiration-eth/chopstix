@@ -19,7 +19,7 @@ Fan-made homage. It isn't affiliated with any launch company, and it has no logo
 | `Space` | Stage: release the upper stage (only inside the window) |
 | `Esc` | Pause / menu · `R` retry · `M` mute · `H` how to fly |
 
-You need **both banks** to lift off. One bank alone spins you. On touch devices, the same five controls appear as multi-touch pads, `W`/`Q` under the left thumb and `O`/`P` under the right. Hold several at once.
+You need **both banks** to lift off. One bank alone spins you. On desktop, a control strip along the bottom lights up as you press keys, and you can click its pads with the mouse. On touch devices, the same five controls appear as multi-touch pads, `W`/`Q` under the left thumb and `O`/`P` under the right. Hold several at once.
 
 **Scoring:** max altitude, release accuracy (how close to the target and how upright), the landing (speed, sink rate, drift and tilt at the arms) and the fuel left. A catch is worth far more than a touchdown on the pad. Your best score is saved locally.
 
@@ -52,6 +52,7 @@ You need **both banks** to lift off. One bank alone spins you. On touch devices,
 - The game engine chunk is lazy-loaded after the UI paints.
 - The viewport is locked: no zoom, no scroll, `touch-action: none`, safe-area insets, and a landscape hint in portrait.
 - The game pauses automatically when the tab is hidden.
+- A sanitize pass before bloom replaces any NaN/Inf pixel and clamps HDR, so one bad fragment can't black out the frame. `?tier=low|medium|high` pins the tier for testing; `scripts/blackframes.mjs` (GL=llvmpipe) checks for black frames with Q+P held.
 
 ## Develop
 

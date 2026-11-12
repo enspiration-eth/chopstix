@@ -275,7 +275,7 @@ export const touchPadsView = (model: Model, h: HtmlBuilder<Message>): Html =>
       pad(h, 'o', 'O', 'NOSE ▶', 'pad-o'),
       pad(h, 'p', 'P', 'RIGHT BANK', 'pad-p'),
       ...(model.telemetry.stacked && model.telemetry.phase !== 'Pad'
-        ? [pad(h, 'stage', '⇪', 'STAGE', `pad-stage ${model.telemetry.inWindow ? 'is-ready' : ''}`)]
+        ? [pad(h, 'stage', model.touch ? '⇪' : 'SPACE', 'STAGE', `pad-stage ${model.telemetry.inWindow ? 'is-ready' : ''}`)]
         : []),
     ],
   )

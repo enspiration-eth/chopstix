@@ -10,6 +10,8 @@ export class Input {
   private readonly held = new Set<Key>()
   private readonly touch = new Map<number, string>()
   private stageLatch = false
+  private stageKeyDown = false
+  private padsDirty = true
   enabled = false
   private readonly cleanups: Array<() => void> = []
 
@@ -27,14 +29,19 @@ export class Input {
       e.preventDefault()
       if (k === 'stage') {
         if (!e.repeat) this.stageLatch = true
+        this.stageKeyDown = true
       } else this.held.add(k)
+      this.padsDirty = true
     }
     const up = (e: KeyboardEvent) => {
       const k = keyMap[e.code]
       if (!k) return
       if (k !== 'stage') this.held.delete(k)
+      else this.stageKeyDown = false
+      this.padsDirty = true
     }
     const blur = () => {
+      this.stageKeyDown = false
       this.held.clear()
       this.touch.clear()
       this.syncPads()
@@ -92,14 +99,21 @@ export class Input {
   }
 
   /** light up pads directly (no UI round-trip) so feedback is instant */
+  /** Pads light up for touches, mouse presses and the matching keyboard keys. */
   private syncPads() {
-    const active = new Set(this.touch.values())
+    this.padsDirty = false
+    const active = new Set<string>([...this.touch.values(), ...this.held])
+    if (this.stageKeyDown) active.add('stage')
     document.querySelectorAll<HTMLElement>('[data-control]').forEach(el => {
       el.classList.toggle('is-held', active.has(el.dataset['control'] ?? ''))
     })
   }
 
+  private reads = 0
+
   read(): Controls {
+    // keep the pads' lit state in step with keys, and re-apply it after the UI re-renders the pads
+    if (this.padsDirty || ++this.reads % 12 === 0) this.syncPads()
     const stage = this.stageLatch
     this.stageLatch = false
     if (!this.enabled) return { q: false, w: false, o: false, p: false, stage: false }
@@ -107,6 +121,7 @@ export class Input {
   }
 
   reset() {
+    this.stageKeyDown = false
     this.held.clear()
     this.touch.clear()
     this.stageLatch = false

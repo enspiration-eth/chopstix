@@ -31,13 +31,15 @@ export class QualityGovernor {
   private fast = 0
   private settle = 2
 
-  constructor(start: number) {
+  constructor(start: number, private readonly pinned = false) {
     this.tier = start
     this.ceiling = start
   }
 
   /** returns true when the tier changed */
   sample(frameMs: number, dt: number): boolean {
+    this.ema += (Math.min(frameMs, 100) - this.ema) * (this.pinned ? 0.05 : 0)
+    if (this.pinned) return false
     if (this.settle > 0) {
       this.settle -= dt
       return false
@@ -70,4 +72,12 @@ export class QualityGovernor {
     this.ema = 16.7
     this.settle = 2
   }
+}
+
+/** `?tier=low|medium|high` pins the quality tier (debugging and screenshots). */
+export const pinnedTier = (): number | null => {
+  if (typeof location === 'undefined') return null
+  const t = new URLSearchParams(location.search).get('tier')?.toUpperCase()
+  const i = TIERS.findIndex(x => x.name === t)
+  return i >= 0 ? i : null
 }
