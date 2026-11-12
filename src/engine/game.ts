@@ -303,6 +303,13 @@ export class Game {
     this.prev = this.state
   }
 
+  private debugCam: { pos: THREE.Vector3; look: THREE.Vector3 } | null = null
+
+  /** Debug: park the camera anywhere (e.g. 25 km up, looking down); pass null to hand it back. */
+  debugCamera(pos: [number, number, number] | null, look: [number, number, number] = [0, 0, 0]) {
+    this.debugCam = pos ? { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look) } : null
+  }
+
   debugState() {
     return this.state
   }
@@ -898,6 +905,10 @@ export class Game {
     this.baseGlow.uniforms.uIntensity.value = thrust * (s.stacked ? 0.8 : 0.55) * (0.9 + 0.1 * Math.random())
 
     this.updateCamera(dt, bx, by, ux, uy)
+    if (this.debugCam) {
+      this.camera.position.copy(this.debugCam.pos)
+      this.camera.lookAt(this.debugCam.look)
+    }
 
     // shared uniforms
     const camAlt = this.camera.position.y
