@@ -262,6 +262,22 @@ export class Game {
     if (p) this.input.reset()
   }
 
+  /** Quality preference from the settings: null = adaptive. A `?tier=` URL pin still wins (debugging). */
+  setQuality(tier: number | null) {
+    if (pinnedTier() !== null) return
+    this.governor.setPinned(tier)
+    this.applyTier()
+    this.emitTelemetry()
+  }
+
+  setSwapNose(on: boolean) {
+    this.input.swapNose = on
+  }
+
+  get qualityPinned() {
+    return this.governor.isPinned
+  }
+
   setMuted(m: boolean) {
     this.audio.setMuted(m)
   }
@@ -491,20 +507,24 @@ export class Game {
     this.telemetryTimer -= dtReal
     if (this.telemetryTimer <= 0) {
       this.telemetryTimer = 0.05
-      const t = telemetry(this.state)
-      const pins = this.pinsHeight()
-      const returning = !this.state.stacked && this.state.phase === 'Return'
-      const g = returning ? guidance(this.state) : null
-      this.cb.onTelemetry({
-        ...t,
-        warp: this.warp,
-        quality: TIERS[this.governor.tier]!.name,
-        fps: 1000 / this.governor.frameMs,
-        inWindow: this.state.stacked && Math.abs(t.altitude - this.state.targetAlt) <= MISSION.releaseWindow,
-        catchH: pins,
-        guide: g ? { ...g, track: this.track.slice() } : null,
-      })
+      this.emitTelemetry()
     }
+  }
+
+  private emitTelemetry() {
+    const t = telemetry(this.state)
+    const pins = this.pinsHeight()
+    const returning = !this.state.stacked && this.state.phase === 'Return'
+    const g = returning ? guidance(this.state) : null
+    this.cb.onTelemetry({
+      ...t,
+      warp: this.warp,
+      quality: TIERS[this.governor.tier]!.name,
+      fps: 1000 / this.governor.frameMs,
+      inWindow: this.state.stacked && Math.abs(t.altitude - this.state.targetAlt) <= MISSION.releaseWindow,
+      catchH: pins,
+      guide: g ? { ...g, track: this.track.slice() } : null,
+    })
   }
 
   private pinsHeight() {

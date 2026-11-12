@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 
-export const Screen = Schema.Literals(['Booting', 'Title', 'HowTo', 'Playing', 'Paused', 'Result'])
+export const Screen = Schema.Literals(['Booting', 'Title', 'HowTo', 'Playing', 'Paused', 'Result', 'Settings'])
 export type Screen = typeof Screen.Type
 
 export const Phase = Schema.Literals(['Pad', 'Ascent', 'Return', 'Caught', 'Touchdown', 'Crashed'])

@@ -8,6 +8,7 @@ import { modifyFields } from 'foldkit/struct'
 import { Callout, Result, Screen, Telemetry, Tone, emptyTelemetry } from './domain'
 import { getGame, setGame } from './gameHost'
 import { hudView, touchPadsView } from './hud'
+import { QUALITY_PREFS, QualityPref, Settings, loadSettings, saveSettings, tierIndex } from './settings'
 
 export const GAME_NAME = 'CHOPSTIX'
 const BEST_KEY = 'chopstix.best.v1'
@@ -25,6 +26,9 @@ export const Model = Schema.Struct({
   muted: Schema.Boolean,
   touch: Schema.Boolean,
   attempts: Schema.Number,
+  settings: Settings,
+  /** where closing the settings goes back to */
+  settingsFrom: Schema.Literals(['Title', 'Paused']),
 })
 export type Model = typeof Model.Type
 
@@ -44,6 +48,10 @@ export const Message = defineMessageUnion({
   ClickedPause: {},
   ClickedResume: {},
   ClickedMute: {},
+  ClickedSettings: {},
+  ClosedSettings: {},
+  PickedQuality: { quality: QualityPref },
+  ToggledSwapNose: {},
   PressedKey: { key: Schema.String },
   LoadedBest: { best: Schema.Number },
   CompletedGameCommand: {},
@@ -86,6 +94,20 @@ export const SetMuted = Command.define('SetMuted', {
         /* private mode */
       }
       Option.map(getGame(), g => g.setMuted(muted))
+      return Message.CompletedGameCommand()
+    }),
+})
+
+export const ApplySettings = Command.define('ApplySettings', {
+  args: { settings: Settings },
+  messages: [Message.CompletedGameCommand],
+  execute: ({ settings }) =>
+    Effect.sync(() => {
+      saveSettings(settings)
+      Option.map(getGame(), g => {
+        g.setQuality(tierIndex(settings.quality))
+        g.setSwapNose(settings.swapNose)
+      })
       return Message.CompletedGameCommand()
     }),
 })
@@ -174,6 +196,9 @@ const mountGame = (element: Element) =>
             } catch {
               /* ignore */
             }
+            const saved = loadSettings()
+            game.setQuality(tierIndex(saved.quality))
+            game.setSwapNose(saved.swapNose)
             setGame(game)
             return game
           },
@@ -240,6 +265,31 @@ const resume = (model: Model): UpdateReturn => ({
   commands: [SetPaused({ paused: false })],
 })
 
+const openSettings = (model: Model): UpdateReturn => {
+  switch (model.screen) {
+    case 'Playing':
+      return {
+        model: modifyFields(model, { screen: () => 'Settings' as const, settingsFrom: () => 'Paused' as const }),
+        commands: [SetPaused({ paused: true })],
+      }
+    case 'Paused':
+      return { model: modifyFields(model, { screen: () => 'Settings' as const, settingsFrom: () => 'Paused' as const }) }
+    case 'Title':
+    case 'HowTo':
+      return { model: modifyFields(model, { screen: () => 'Settings' as const, settingsFrom: () => 'Title' as const }) }
+    default:
+      return { model }
+  }
+}
+
+const closeSettings = (model: Model): UpdateReturn =>
+  model.screen === 'Settings' ? { model: modifyFields(model, { screen: () => model.settingsFrom }) } : { model }
+
+const changeSettings = (model: Model, f: (s: Settings) => Settings): UpdateReturn => {
+  const settings = f(model.settings)
+  return { model: modifyFields(model, { settings: () => settings }), commands: [ApplySettings({ settings })] }
+}
+
 export const update = (model: Model, message: Message): UpdateReturn =>
   Message.match<UpdateReturn>(message, {
     SucceededMountGame: () => ({
@@ -286,24 +336,35 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       const muted = !model.muted
       return { model: modifyFields(model, { muted: () => muted }), commands: [SetMuted({ muted })] }
     },
+    ClickedSettings: () => openSettings(model),
+    ClosedSettings: () => closeSettings(model),
+    PickedQuality: ({ quality }) => changeSettings(model, s => ({ ...s, quality })),
+    ToggledSwapNose: () => changeSettings(model, s => ({ ...s, swapNose: !s.swapNose })),
     PressedKey: ({ key }) => {
       const k = key.toLowerCase()
       switch (model.screen) {
         case 'Title':
           if (k === 'enter' || k === ' ') return launch(model)
           if (k === 'h') return { model: modifyFields(model, { screen: () => 'HowTo' as const }) }
+          if (k === 's') return openSettings(model)
           break
         case 'HowTo':
           if (k === 'enter' || k === ' ') return launch(model)
           if (k === 'escape') return { model: modifyFields(model, { screen: () => 'Title' as const }) }
+          if (k === 's') return openSettings(model)
           break
         case 'Playing':
           if (k === 'escape') return pause(model)
           if (k === 'r') return launch(model)
+          if (k === 's') return openSettings(model)
           break
         case 'Paused':
           if (k === 'escape' || k === 'enter') return resume(model)
           if (k === 'r') return launch(model)
+          if (k === 's') return openSettings(model)
+          break
+        case 'Settings':
+          if (k === 'escape' || k === 's' || k === 'enter') return closeSettings(model)
           break
         case 'Result':
           if (k === 'r' || k === 'enter' || k === ' ') return launch(model)
@@ -347,6 +408,8 @@ export const init: Runtime.ApplicationInit<Model, Message> = () => ({
     muted: detectMuted(),
     touch: detectTouch(),
     attempts: 0,
+    settings: loadSettings(),
+    settingsFrom: 'Title',
   },
   commands: [LoadBest()],
 })
@@ -407,6 +470,7 @@ const titleView = (model: Model, h: HtmlBuilder<Message>): Html =>
         [
           button(h, 'LAUNCH', Message.ClickedLaunch(), true, model.touch ? '' : 'ENTER'),
           button(h, 'HOW TO FLY', Message.ClickedHowTo(), false, model.touch ? '' : 'H'),
+          button(h, 'SETTINGS', Message.ClickedSettings(), false, model.touch ? '' : 'S'),
         ],
       ),
       h.p([h.Class('best')], [model.best > 0 ? `PERSONAL BEST  ${fmt(model.best)}` : 'NO FLIGHTS LOGGED YET']),
@@ -457,7 +521,13 @@ const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
             [h.Class('howto-card')],
             [
               h.div([h.Class('keys')], [keyCap(h, 'W'), keyCap(h, 'O')]),
-              h.p([], [h.strong([], ['Gimbal & grid fins. ']), 'W swings the nose left, O swings it right. The actuators keep moving while held and sag back slowly. Gimbal needs thrust; grid fins need air.']),
+              h.p([], [
+                h.strong([], ['Gimbal & grid fins. ']),
+                model.settings.swapNose
+                  ? 'W swings the nose right, O swings it left (swapped in Settings). '
+                  : 'W swings the nose left, O swings it right. ',
+                'The actuators keep moving while held and sag back slowly. Gimbal needs thrust; grid fins need air.',
+              ]),
             ],
           ),
           h.div(
@@ -486,8 +556,8 @@ const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
         ],
       ),
       model.touch
-        ? h.p([h.Class('fineprint')], ['On touch: left thumb Q (low) and W (high), right thumb P (low) and O (high). STAGE is centre-bottom. Landscape plays best.'])
-        : h.p([h.Class('fineprint')], ['Esc pauses · R restarts · M mutes']),
+        ? h.p([h.Class('fineprint')], [`On touch: left thumb Q (low) and W (high, nose ${model.settings.swapNose ? 'right' : 'left'}), right thumb P (low) and O (high, nose ${model.settings.swapNose ? 'left' : 'right'}). STAGE is centre-bottom. Landscape plays best.`])
+        : h.p([h.Class('fineprint')], ['Esc pauses · R restarts · M mutes · S settings']),
       h.div(
         [h.Class('row')],
         [button(h, 'LAUNCH', Message.ClickedLaunch(), true, model.touch ? '' : 'ENTER'), button(h, 'BACK', Message.ClickedBackToTitle(), false, model.touch ? '' : 'ESC')],
@@ -550,21 +620,88 @@ export const formatMet = (met: number) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-const pausedView = (h: HtmlBuilder<Message>): Html =>
+const pausedView = (model: Model, h: HtmlBuilder<Message>): Html =>
   overlay(h, 'overlay-paused', Option.some(Message.ClickedResume()), [
       h.h2([h.Class('h2')], ['HOLD HOLD HOLD']),
       h.div(
         [h.Class('row')],
-        [button(h, 'RESUME', Message.ClickedResume(), true), button(h, 'RESTART', Message.ClickedRetry()), button(h, 'MENU', Message.ClickedBackToTitle())],
+        [
+          button(h, 'RESUME', Message.ClickedResume(), true),
+          button(h, 'RESTART', Message.ClickedRetry()),
+          button(h, 'SETTINGS', Message.ClickedSettings(), false, model.touch ? '' : 'S'),
+          button(h, 'MENU', Message.ClickedBackToTitle()),
+        ],
       ),
   ])
+
+const settingsView = (model: Model, h: HtmlBuilder<Message>): Html => {
+  const s = model.settings
+  const rendering = model.telemetry.quality
+  return overlay(h, 'overlay-settings', Option.some(Message.ClosedSettings()), [
+    h.h2([h.Class('h2')], ['SETTINGS']),
+    h.div(
+      [h.Class('settings-group')],
+      [
+        h.div([h.Class('settings-label')], ['GRAPHICS QUALITY']),
+        h.div(
+          [h.Class('seg'), h.Attribute('role', 'radiogroup'), h.AriaLabel('Graphics quality')],
+          QUALITY_PREFS.map(q =>
+            h.button(
+              [
+                h.Class(`seg-btn ${s.quality === q ? 'is-on' : ''}`),
+                h.DataAttribute('quality', q),
+                h.Attribute('role', 'radio'),
+                h.Attribute('aria-checked', s.quality === q ? 'true' : 'false'),
+                h.OnClick(Message.PickedQuality({ quality: q })),
+                h.Type('button'),
+              ],
+              [q.toUpperCase()],
+            ),
+          ),
+        ),
+        h.p(
+          [h.Class('settings-note')],
+          [
+            s.quality === 'Auto'
+              ? `Adapts to your device and steps down if frames slow. Rendering now: ${rendering}.`
+              : `Locked to ${s.quality.toUpperCase()} — the automatic step-down stays off. Rendering now: ${rendering}.`,
+          ],
+        ),
+      ],
+    ),
+    h.div(
+      [h.Class('settings-group')],
+      [
+        h.div([h.Class('settings-label')], ['CONTROLS']),
+        h.button(
+          [
+            h.Class(`toggle ${s.swapNose ? 'is-on' : ''}`),
+            h.DataAttribute('setting', 'swap-nose'),
+            h.Attribute('role', 'switch'),
+            h.Attribute('aria-checked', s.swapNose ? 'true' : 'false'),
+            h.OnClick(Message.ToggledSwapNose()),
+            h.Type('button'),
+          ],
+          [
+            h.span([h.Class('toggle-text')], [h.strong([], ['SWAP W / O']), h.span([], [s.swapNose ? 'W noses right · O noses left' : 'W noses left · O noses right'])]),
+            h.span([h.Class('toggle-track')], [h.span([h.Class('toggle-knob')], [])]),
+          ],
+        ),
+      ],
+    ),
+    h.div([h.Class('row')], [button(h, 'DONE', Message.ClosedSettings(), true, model.touch ? '' : 'ESC')]),
+  ])
+}
 
 const topRight = (model: Model, h: HtmlBuilder<Message>) =>
   h.div(
     [h.Class('corner-buttons')],
     [
       ...(model.screen === 'Playing'
-        ? [h.button([h.Class('icon-btn'), h.OnClick(Message.ClickedPause()), h.Type('button'), h.AriaLabel('Pause')], ['❚❚'])]
+        ? [
+            h.button([h.Class('icon-btn icon-gear'), h.OnClick(Message.ClickedSettings()), h.Type('button'), h.AriaLabel('Settings')], ['\u2699\uFE0E']),
+            h.button([h.Class('icon-btn'), h.OnClick(Message.ClickedPause()), h.Type('button'), h.AriaLabel('Pause')], ['❚❚']),
+          ]
         : []),
       h.button(
         [h.Class('icon-btn'), h.OnClick(Message.ClickedMute()), h.Type('button'), h.AriaLabel(model.muted ? 'Unmute' : 'Mute')],
@@ -574,7 +711,7 @@ const topRight = (model: Model, h: HtmlBuilder<Message>) =>
   )
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => {
-  const flying = model.screen === 'Playing' || model.screen === 'Paused'
+  const flying = model.screen === 'Playing' || model.screen === 'Paused' || (model.screen === 'Settings' && model.settingsFrom === 'Paused')
   return {
     title: model.screen === 'Playing' ? `${GAME_NAME} · T+${formatMet(model.telemetry.met)}` : `${GAME_NAME} — catch the booster`,
     body: h.div(
@@ -601,7 +738,8 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Document => {
         ...(model.screen === 'Title' ? [titleView(model, h)] : []),
         ...(model.screen === 'HowTo' ? [howToView(model, h)] : []),
         ...(model.screen === 'Result' ? [resultView(model, h)] : []),
-        ...(model.screen === 'Paused' ? [pausedView(h)] : []),
+        ...(model.screen === 'Paused' ? [pausedView(model, h)] : []),
+        ...(model.screen === 'Settings' ? [settingsView(model, h)] : []),
         ...(model.screen !== 'Booting' ? [topRight(model, h)] : []),
         h.div([h.Class('rotate-hint')], ['Rotate to landscape for the full view']),
       ],

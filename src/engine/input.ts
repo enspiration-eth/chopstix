@@ -13,6 +13,8 @@ export class Input {
   private stageKeyDown = false
   private padsDirty = true
   enabled = false
+  /** mirror the nose controls: W steers right, O steers left (keys and pads alike) */
+  swapNose = false
   private readonly cleanups: Array<() => void> = []
 
   constructor() {
@@ -117,7 +119,9 @@ export class Input {
     const stage = this.stageLatch
     this.stageLatch = false
     if (!this.enabled) return { q: false, w: false, o: false, p: false, stage: false }
-    return { q: this.isHeld('q'), w: this.isHeld('w'), o: this.isHeld('o'), p: this.isHeld('p'), stage }
+    const w = this.isHeld('w')
+    const o = this.isHeld('o')
+    return { q: this.isHeld('q'), w: this.swapNose ? o : w, o: this.swapNose ? w : o, p: this.isHeld('p'), stage }
   }
 
   reset() {

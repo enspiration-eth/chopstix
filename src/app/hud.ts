@@ -147,7 +147,7 @@ export const hudView = (model: Model, h: HtmlBuilder<Message>): Html => {
       h.div(
         [h.Class('hud-top')],
         [
-          h.div([h.Class('hud-mission')], [h.span([h.Class('live-dot')], []), `FLIGHT ${String(model.attempts).padStart(3, '0')}`]),
+          h.div([h.Class('hud-mission')], [h.span([h.Class('live-dot')], []), h.span([h.Class('hud-mission-label')], [`FLIGHT ${String(model.attempts).padStart(3, '0')}`])]),
           h.div([h.Class('hud-phase')], [phaseLabel(t)]),
           ...(t.warp > 1.2 ? [h.div([h.Class('hud-warp')], [`▶▶ ${t.warp.toFixed(1)}×`])] : []),
         ],
@@ -281,9 +281,10 @@ export const touchPadsView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('pads')],
     [
-      pad(h, 'w', 'W', 'NOSE ◀', 'pad-w'),
+      // swapped: keys stay where they are on the keyboard, their labels tell the truth about what they do
+      pad(h, 'w', 'W', model.settings.swapNose ? 'NOSE ▶' : 'NOSE ◀', 'pad-w'),
       pad(h, 'q', 'Q', 'LEFT BANK', 'pad-q'),
-      pad(h, 'o', 'O', 'NOSE ▶', 'pad-o'),
+      pad(h, 'o', 'O', model.settings.swapNose ? 'NOSE ◀' : 'NOSE ▶', 'pad-o'),
       pad(h, 'p', 'P', 'RIGHT BANK', 'pad-p'),
       ...(model.telemetry.stacked && model.telemetry.phase !== 'Pad'
         ? [pad(h, 'stage', model.touch ? '⇪' : 'SPACE', 'STAGE', `pad-stage ${model.telemetry.inWindow ? 'is-ready' : ''}`)]

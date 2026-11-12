@@ -29,14 +29,32 @@ export const isMobile = () =>
 export class QualityGovernor {
   tier: number
   private readonly ceiling: number
+  private pinned: boolean
   private ema = 16.7
   private slow = 0
   private fast = 0
   private settle = 2
 
-  constructor(start: number, private readonly pinned = false) {
+  constructor(start: number, pinned = false) {
     this.tier = start
     this.ceiling = start
+    this.pinned = pinned
+  }
+
+  /** Fix the tier (the governor never moves it) or, with null, hand control back to the adaptive mode. */
+  setPinned(tier: number | null) {
+    if (tier === null) {
+      this.pinned = false
+      this.tier = this.ceiling
+    } else {
+      this.pinned = true
+      this.tier = Math.max(0, Math.min(TIERS.length - 1, tier))
+    }
+    this.reset()
+  }
+
+  get isPinned() {
+    return this.pinned
   }
 
   /** returns true when the tier changed */
