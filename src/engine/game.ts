@@ -319,6 +319,21 @@ export class Game {
     this.offset.set(110, -30, 230)
   }
 
+  private viewShift = 0
+  private viewShiftCheck = 0
+
+  private updateViewShift(dt: number) {
+    this.viewShiftCheck -= dt
+    if (this.viewShiftCheck > 0) return
+    this.viewShiftCheck = 0.4
+    const pads = document.querySelector('.pads')
+    const shift = pads ? Math.round(pads.getBoundingClientRect().height / 2) : 0
+    if (shift !== this.viewShift) {
+      this.viewShift = shift
+      this.resize()
+    }
+  }
+
   private resize() {
     const w = this.container.clientWidth || window.innerWidth
     const h = this.container.clientHeight || window.innerHeight
@@ -327,6 +342,10 @@ export class Game {
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     this.camera.fov = w < h ? 68 : 52
+    // On touch layouts the control strip covers the bottom of the canvas: shift the image centre up
+    // by half the strip so the rocket stays centred in the part of the screen you can see.
+    if (this.viewShift > 0) this.camera.setViewOffset(w, h, 0, this.viewShift, w, h)
+    else this.camera.clearViewOffset()
     this.camera.updateProjectionMatrix()
     this.post.setSize(w, h, tier.bloomScale)
   }
@@ -712,6 +731,7 @@ export class Game {
   // ---------------------------------------------------------------- rendering
 
   private render(dt: number) {
+    this.updateViewShift(dt)
     const s = this.state
     const p = this.prev
     const alpha = this.paused ? 1 : Math.min(1, this.acc / DT)

@@ -269,8 +269,6 @@ html, body {
   .fuel { width: 64px; }
   .tilt { transform: scale(0.85); }
   .quality { display: none; }
-  .is-touch .pad-q, .is-touch .pad-p { bottom: calc(118px + var(--safe-b)); }
-  .is-touch .pad-w, .is-touch .pad-o { bottom: calc(118px + var(--safe-b) + clamp(86px, 14.5vw, 128px)); }
   .callouts { top: calc(46px + var(--safe-t)); }
   .catch-box { top: 18%; }
   .hud-top { font-size: 12px; }
@@ -284,27 +282,6 @@ html, body {
   .hud-bottom { grid-template-columns: 1fr 1fr; }
   .timeline { grid-column: 1 / -1; order: -1; }
   .panel-left .gauges .gauge:nth-child(2) { display: none; }
-  .is-touch .pad-q, .is-touch .pad-p { bottom: calc(200px + var(--safe-b)); }
-  .is-touch .pad-w, .is-touch .pad-o { bottom: calc(200px + var(--safe-b) + clamp(86px, 14.5vw, 128px)); }
-}
-
-/* touch phones in landscape: thumbs own the corners, HUD squeezes into the middle */
-@media (max-height: 520px) {
-  .is-touch .pad { width: 84px; height: 84px; border-radius: 18px; }
-  .is-touch .pad-key { font-size: 26px; }
-  .is-touch .pad-label { font-size: 8px; }
-  .is-touch .pad-q, .is-touch .pad-p { bottom: calc(12px + var(--safe-b)); }
-  .is-touch .pad-w, .is-touch .pad-o { bottom: calc(12px + var(--safe-b) + 94px); }
-  .is-touch .pad-stage { top: auto; bottom: calc(64px + var(--safe-b)); transform: translateX(-50%); width: 96px; height: 52px; }
-  .is-touch .pad-stage.is-held { transform: translateX(-50%) scale(0.95); }
-  .is-touch .hud-bottom { padding-left: calc(112px + var(--safe-l)); padding-right: calc(112px + var(--safe-r)); gap: 8px; }
-  .is-touch .panel-title, .is-touch .engine-map, .is-touch .tilt { display: none; }
-  .is-touch .gauge { width: 66px; height: 66px; }
-  .is-touch .gauge-value { font-size: 17px; }
-  .is-touch .gauge-label { display: none; }
-  .is-touch .ladder { height: 52px; }
-  .is-touch .prompt { top: calc(52px + var(--safe-t)); font-size: 12px; }
-  .is-touch .catch-box { top: calc(80px + var(--safe-t)); }
 }
 
 /* short landscape screens: keep every overlay on one screen */
@@ -347,4 +324,84 @@ html, body {
   .overlay { padding-left: calc(14px + var(--safe-l)); padding-right: calc(14px + var(--safe-r)); }
   .howto-grid { grid-template-columns: 1fr; }
   .score-row { grid-template-columns: 1.3fr 1fr 0.7fr; }
+}
+
+/* ---------- touch layout: pads live in their own strip along the bottom, HUD sits above it ---------- */
+.is-touch { --pad-w: 92px; --pad-h: 80px; --pad-gap: 10px; --strip-pad: 8px; --strip: calc(var(--pad-h) + 2 * var(--strip-pad) + var(--safe-b)); }
+.is-touch .pads {
+  inset: auto 0 0 0; height: var(--strip);
+  display: flex; align-items: center; gap: var(--pad-gap);
+  padding: var(--strip-pad) calc(10px + var(--safe-r)) calc(var(--strip-pad) + var(--safe-b)) calc(10px + var(--safe-l));
+  background: linear-gradient(to top, rgba(3, 5, 9, 0.7), rgba(3, 5, 9, 0.35));
+  border-top: 1px solid var(--line);
+}
+.is-touch .pad { position: relative; inset: auto; width: var(--pad-w); height: var(--pad-h); border-radius: 18px; flex: none; }
+.is-touch .pad-key { font-size: 28px; }
+.is-touch .pad-label { font-size: 9px; }
+.is-touch .pad-q { order: 1; }
+.is-touch .pad-w { order: 2; margin-right: auto; }
+.is-touch .pad-stage { order: 3; transform: none; width: 104px; height: calc(var(--pad-h) - 16px); border-radius: 32px; }
+.is-touch .pad-stage.is-held { transform: scale(0.95); }
+.is-touch .pad-o { order: 4; margin-left: auto; }
+.is-touch .pad-p { order: 5; }
+.is-touch .hud-bottom { bottom: var(--strip); padding-bottom: 6px; }
+.is-touch .rotate-hint { bottom: auto; }
+
+/* landscape phones: one short pad row, a one-line HUD above it */
+@media (max-height: 520px) {
+  .is-touch { --pad-w: 88px; --pad-h: 64px; --strip-pad: 6px; }
+  .is-touch .pad-key { font-size: 24px; }
+  .is-touch .pad-label { font-size: 8px; }
+  .is-touch .hud-bottom { gap: 10px; padding-top: 14px; }
+  .is-touch .panel-title, .is-touch .engine-map, .is-touch .gauge-label, .is-touch .quality { display: none; }
+  .is-touch .panel-left { flex-direction: row; align-items: center; gap: 8px; }
+  .is-touch .panel-row { gap: 8px; }
+  .is-touch .gauge { width: 58px; height: 58px; }
+  .is-touch .gauge-value { font-size: 16px; }
+  .is-touch .gauge-unit { font-size: 7px; margin-top: 1px; }
+  .is-touch .fuel { width: 58px; }
+  .is-touch .fuel .readout-value { font-size: 13px; }
+  .is-touch .tilt { transform: scale(0.8); width: 56px; height: 56px; margin: -4px 0; }
+  .is-touch .ladder { height: 52px; }
+  .is-touch .readout-value { font-size: 13px; }
+  .is-touch .readout-label { font-size: 9px; }
+  .is-touch .timeline { padding-bottom: 0; }
+  .is-touch .timeline-clock strong { font-size: 22px; }
+  .is-touch .timeline-clock span { font-size: 12px; }
+  .is-touch .prompt { top: calc(46px + var(--safe-t)); font-size: 11px; }
+  .is-touch .callouts { top: calc(40px + var(--safe-t)); }
+  .is-touch .callout { font-size: 14px; letter-spacing: 0.16em; max-width: 54vw; white-space: normal; text-align: center; }
+  .is-touch .catch-box .readout { min-width: 128px; }
+  .is-touch .catch-box { top: calc(70px + var(--safe-t)); padding: 6px 8px; }
+}
+
+/* portrait phones: two pad rows (W over Q on the left, O over P on the right, STAGE between) */
+@media (orientation: portrait) and (max-width: 760px) {
+  .is-touch { --pad-w: 104px; --pad-h: 72px; --strip-pad: 10px; --strip: calc(2 * var(--pad-h) + var(--pad-gap) + 2 * var(--strip-pad) + var(--safe-b)); }
+  .is-touch .pads {
+    display: grid; grid-template-columns: var(--pad-w) 1fr var(--pad-w); grid-template-rows: var(--pad-h) var(--pad-h);
+    row-gap: var(--pad-gap); column-gap: 10px; align-items: stretch;
+  }
+  .is-touch .pad { width: auto; height: auto; margin: 0; }
+  .is-touch .pad-w { grid-area: 1 / 1; }
+  .is-touch .pad-q { grid-area: 2 / 1; }
+  .is-touch .pad-o { grid-area: 1 / 3; }
+  .is-touch .pad-p { grid-area: 2 / 3; }
+  .is-touch .pad-stage { grid-area: 1 / 2 / 3 / 3; align-self: center; justify-self: center; width: min(120px, 100%); height: 88px; border-radius: 26px; }
+  .is-touch .hud-bottom { padding-top: 18px; row-gap: 6px; align-items: end; }
+  .is-touch .panel-title, .is-touch .engine-map, .is-touch .quality { display: none; }
+  .is-touch .panel-left .gauges .gauge:nth-child(2) { display: block; }
+  .is-touch .gauge { width: 64px; height: 64px; }
+  .is-touch .gauge-value { font-size: 17px; }
+  .is-touch .gauge-label { display: none; }
+  .is-touch .panel-row { gap: 6px; }
+  .is-touch .fuel { width: 60px; }
+  .is-touch .tilt { transform: scale(0.8); width: 56px; }
+  .is-touch .panel-right { align-items: flex-end; }
+  .is-touch.screen-playing .rotate-hint { top: calc(50px + var(--safe-t)); font-size: 10px; }
+  .is-touch .callouts { top: calc(70px + var(--safe-t)); padding: 0 12px; }
+  .is-touch .callout { font-size: 13px; letter-spacing: 0.14em; white-space: normal; text-align: center; max-width: 100%; }
+  .is-touch .prompt { top: calc(68px + var(--safe-t)); font-size: 11px; white-space: normal; text-align: center; width: calc(100% - 24px); }
+  .is-touch .catch-box { top: 40%; right: calc(12px + var(--safe-r)); padding: 6px 8px; }
+  .is-touch .catch-box .readout { min-width: 130px; }
 }
