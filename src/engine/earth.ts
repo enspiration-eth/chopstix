@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { DECK } from './cloudNoise'
+import { DECK, DECK_COVER_GLSL } from './cloudNoise'
 import { NOISE, SKY } from './glsl'
 
 export const MAX_CLOUD_SHADOWS = 16
@@ -38,6 +38,7 @@ export const createEarth = (sunDir: THREE.Vector3, segments: number, cloudTex: T
       uniform float uTime;
       uniform float uScorch;
       uniform sampler2D uCloudTex;
+      ${DECK_COVER_GLSL}
       uniform float uShadow;
       uniform vec4 uCumulus[${MAX_CLOUD_SHADOWS}];
       // soft shadows of the deck and the cumulus, projected along the sun
@@ -45,9 +46,8 @@ export const createEarth = (sunDir: THREE.Vector3, segments: number, cloudTex: T
         if (uShadow < 0.5) return 1.0;
         float ly = max(L.y, 0.12);
         vec2 d1 = p + L.xz / ly * ${(DECK.base + 150).toFixed(1)};
-        float a = texture2D(uCloudTex, d1 / ${DECK.coverScale.toFixed(1)}).r;
-        float b = texture2D(uCloudTex, d1 / ${DECK.billowScale.toFixed(1)} + 0.37).g;
-        float deck = smoothstep(0.42, 0.64, a * 0.62 + b * 0.38);
+        vec3 w = deckWeather(d1);
+        float deck = deckCoverW(d1 + w.xy, w.z, uTime);
         vec2 d2 = p + L.xz / ly * 1000.0;
         float cu = 0.0;
         for (int i = 0; i < ${MAX_CLOUD_SHADOWS}; i++) {

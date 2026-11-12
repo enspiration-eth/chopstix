@@ -96,10 +96,79 @@ export const createCloudNoise = (): CloudNoise => {
 /** Deck geometry, mirrored by DECK_GLSL in clouds.ts. */
 export const DECK = { base: 2600, thick: 380, coverScale: 7000, billowScale: 1900, detailScale: 420 }
 
-export const deckCover = (n: CloudNoise, x: number, z: number) => {
-  const c = n.sample(x / DECK.coverScale, z / DECK.coverScale, 0) * 0.62 + n.sample(x / DECK.billowScale + 0.37, z / DECK.billowScale + 0.37, 1) * 0.38
-  const t = Math.min(1, Math.max(0, (c - 0.42) / (0.64 - 0.42)))
+/**
+ * Deck coverage that never visibly repeats. The noise texture tiles, so on its own the deck
+ * would repeat every 7 km; from 10+ km up that reads as wallpaper. Three things break it:
+ *  - a slow domain warp (period 31 km, rotated) bends the tile grid so cells never line up,
+ *  - cloud masses mix three rotated scales whose periods (4.4, 7, 11.3 km) are incommensurate,
+ *  - a 61 km "weather" field moves the coverage threshold: clear patches next to dense systems.
+ * Warp and weather vary over kilometres, so the deck shader computes them once per pixel.
+ * The weather offset is picked so the launch site sits under a cloudy system (the ascent punches the deck).
+ * The GLSL below and the CPU functions after it are the same formula.
+ */
+const W = {
+  weatherScale: 61000, weatherRot: [0.3624, -0.932] as const, weatherOff: [0.155, 0.217] as const,
+  warpScale: 31000, warpRot: [0.8253, 0.5646] as const, warpOff: [0.57, 0.29] as const, warpAmp: 2800,
+  coverScale2: 11326, coverRot: [0.2272, 0.9738] as const, coverOff: 0.41,
+  coverScale3: 4423, coverRot3: [0.4536, -0.8912] as const, coverOff3: 0.77,
+  billowRot: [0.9553, -0.2955] as const,
+}
+const f1 = (v: number) => v.toFixed(1)
+const f4 = (v: number) => v.toFixed(4)
+const rotG = (r: readonly [number, number], p: string) =>
+  `vec2(${f4(r[0])} * ${p}.x - ${f4(r[1])} * ${p}.y, ${f4(r[1])} * ${p}.x + ${f4(r[0])} * ${p}.y)`
+const rot = (r: readonly [number, number], x: number, z: number): [number, number] => [r[0] * x - r[1] * z, r[1] * x + r[0] * z]
+
+/** needs `uniform sampler2D uCloudTex` declared before it */
+export const DECK_COVER_GLSL = /* glsl */ `
+// xy: domain-warp offset in metres, z: weather 0 (clear) .. 1 (stormy)
+vec3 deckWeather(vec2 xz) {
+  vec2 q = ${rotG(W.warpRot, 'xz')} / ${f1(W.warpScale)} + vec2(${f4(W.warpOff[0])}, ${f4(W.warpOff[1])});
+  vec2 warp = vec2(texture2D(uCloudTex, q).r, texture2D(uCloudTex, q + vec2(0.5, 0.5)).r) - 0.5;
+  vec2 wq = ${rotG(W.weatherRot, 'xz')} / ${f1(W.weatherScale)} + vec2(${f4(W.weatherOff[0])}, ${f4(W.weatherOff[1])});
+  float weather = smoothstep(0.25, 0.75, texture2D(uCloudTex, wq).r);
+  return vec3(warp * ${f1(W.warpAmp)}, weather);
+}
+vec2 deckDetailUV(vec2 pw) { return ${rotG(W.billowRot, 'pw')} / ${f1(DECK.detailScale)}; }
+// pw: warped position (xz + deckWeather(xz).xy); weather: deckWeather(xz).z
+float deckCoverW(vec2 pw, float weather, float time) {
+  float m1 = texture2D(uCloudTex, pw / ${f1(DECK.coverScale)}).r;
+  float m2 = texture2D(uCloudTex, ${rotG(W.coverRot, 'pw')} / ${f1(W.coverScale2)} + ${f4(W.coverOff)}).r;
+  float m3 = texture2D(uCloudTex, ${rotG(W.coverRot3, 'pw')} / ${f1(W.coverScale3)} + ${f4(W.coverOff3)}).r;
+  float masses = clamp(0.5 + (m1 * 0.4 + m2 * 0.35 + m3 * 0.25 - 0.5) * 1.65, 0.0, 1.0);
+  float b = texture2D(uCloudTex, ${rotG(W.billowRot, 'pw')} / ${f1(DECK.billowScale)} + 0.37 + vec2(time * 0.0006, 0.0)).g;
+  float lo = mix(0.50, 0.33, weather);
+  return smoothstep(lo, lo + 0.22, masses * 0.62 + b * 0.38);
+}
+`
+
+const smooth = (a: number, b: number, v: number) => {
+  const t = Math.min(1, Math.max(0, (v - a) / (b - a)))
   return t * t * (3 - 2 * t)
+}
+
+export const deckWeather = (n: CloudNoise, x: number, z: number): [number, number, number] => {
+  const [qx0, qz0] = rot(W.warpRot, x, z)
+  const qx = qx0 / W.warpScale + W.warpOff[0], qz = qz0 / W.warpScale + W.warpOff[1]
+  const wx = n.sample(qx, qz, 0) - 0.5, wz = n.sample(qx + 0.5, qz + 0.5, 0) - 0.5
+  const [rx, rz] = rot(W.weatherRot, x, z)
+  const weather = smooth(0.25, 0.75, n.sample(rx / W.weatherScale + W.weatherOff[0], rz / W.weatherScale + W.weatherOff[1], 0))
+  return [wx * W.warpAmp, wz * W.warpAmp, weather]
+}
+
+export const deckCover = (n: CloudNoise, x: number, z: number, time = 0) => {
+  const [wx, wz, weather] = deckWeather(n, x, z)
+  const px = x + wx, pz = z + wz
+  const m1 = n.sample(px / DECK.coverScale, pz / DECK.coverScale, 0)
+  const [cx, cz] = rot(W.coverRot, px, pz)
+  const m2 = n.sample(cx / W.coverScale2 + W.coverOff, cz / W.coverScale2 + W.coverOff, 0)
+  const [ex, ez] = rot(W.coverRot3, px, pz)
+  const m3 = n.sample(ex / W.coverScale3 + W.coverOff3, ez / W.coverScale3 + W.coverOff3, 0)
+  const masses = Math.min(1, Math.max(0, 0.5 + (m1 * 0.4 + m2 * 0.35 + m3 * 0.25 - 0.5) * 1.65))
+  const [bx, bz] = rot(W.billowRot, px, pz)
+  const b = n.sample(bx / DECK.billowScale + 0.37 + time * 0.0006, bz / DECK.billowScale + 0.37, 1)
+  const lo = 0.50 + (0.33 - 0.50) * weather
+  return smooth(lo, lo + 0.22, masses * 0.62 + b * 0.38)
 }
 
 /** 0..1 how deep inside the deck a point is (for the camera-in-cloud whiteout). */

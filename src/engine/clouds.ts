@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { DECK } from './cloudNoise'
+import { DECK, DECK_COVER_GLSL } from './cloudNoise'
 import { EARTH_RADIUS } from './earth'
 import { SKY } from './glsl'
 
@@ -75,11 +75,7 @@ vec3 aerial(vec3 col, vec3 w, float alt, out float fog) {
 `
 
 const DECK_GLSL = /* glsl */ `
-float deckCover(vec2 xz) {
-  float a = texture2D(uCloudTex, xz / ${DECK.coverScale.toFixed(1)}).r;
-  float b = texture2D(uCloudTex, xz / ${DECK.billowScale.toFixed(1)} + 0.37 + vec2(uTime * 0.0006, 0.0)).g;
-  return smoothstep(0.42, 0.64, a * 0.62 + b * 0.38);
-}
+${DECK_COVER_GLSL}
 float deckTop(float c, float detail) {
   return ${DECK.base.toFixed(1)} + ${DECK.thick.toFixed(1)} * (0.18 + 0.82 * pow(clamp(c, 0.0, 1.0), 1.3)) + (detail - 0.5) * 70.0 * c;
 }
@@ -110,10 +106,17 @@ export const createCloudPuffs = (sunDir: THREE.Vector3, noise: THREE.Texture, co
   }
   const clusterCount = Math.max(4, Math.floor(count / 7))
   const clusters: CumulusCluster[] = []
+  // random scatter (area-uniform) with a minimum spacing: no spiral or grid for the eye to find
   for (let c = 0; c < clusterCount; c++) {
-    const ang = c * 2.399 + 0.6
-    const rad = 600 + Math.sqrt((c + 1) / clusterCount) * 6500
-    clusters.push({ x: Math.cos(ang) * rad, z: Math.sin(ang) * rad - 400, r: 330 + rnd() * 320 })
+    let x = 0, z = 0
+    for (let tries = 0; tries < 24; tries++) {
+      const ang = rnd() * Math.PI * 2
+      const rad = 600 + Math.sqrt(rnd()) * 6800
+      x = Math.cos(ang) * rad
+      z = Math.sin(ang) * rad - 400
+      if (clusters.every((o) => Math.hypot(o.x - x, o.z - z) > 750)) break
+    }
+    clusters.push({ x, z, r: 280 + rnd() * 420 })
   }
   // one bank right over the pad so the rocket punches through it
   clusters[0] = { x: 40, z: -80, r: 360 }
@@ -306,7 +309,9 @@ export const createCloudDeck = (sunDir: THREE.Vector3, noise: THREE.Texture, max
       vec2 toSun = L.xz / max(length(L.xz), 1e-4);
       float sinE = max(L.y, 0.12);
       vec3 pFirst = ro + V * (t0 + span * 0.5 / (n * n));
-      float cShadow = deckCover(pFirst.xz + toSun * 380.0);
+      // warp + weather vary over kilometres: once per pixel, shared by every step
+      vec3 wx = deckWeather(pFirst.xz);
+      float cShadow = deckCoverW(pFirst.xz + wx.xy + toSun * 380.0, wx.z, uTime);
       vec3 ambTop = skyColor(vec3(0.0, 1.0, 0.0), uAltitude) * 1.3 + vec3(0.34);
       vec3 ambBase = vec3(0.20, 0.23, 0.30);
       float phase = mix(1.0, hg(dot(V, L), 0.55), 0.5);
@@ -321,12 +326,13 @@ export const createCloudDeck = (sunDir: THREE.Vector3, noise: THREE.Texture, max
         float ds = max(span * 2.0 * u / n, span / (n * n));
         vec3 p = ro + V * t;
         float y = slabH(p);
-        float c = deckCover(p.xz);
+        vec2 pw = p.xz + wx.xy;
+        float c = deckCoverW(pw, wx.z, uTime);
         if (c < 0.01) continue;
         // pseudo-3D detail: blend two decorrelated layers of the 2D noise by height
         float ly = max(y - ${DECK.base.toFixed(1)}, 0.0) / 150.0;
         float fl = floor(ly);
-        vec2 dp = p.xz / ${DECK.detailScale.toFixed(1)} + vec2(uTime * 0.002, 0.0);
+        vec2 dp = deckDetailUV(pw) + vec2(uTime * 0.002, 0.0);
         float detail = mix(texture2D(uCloudTex, dp + fl * vec2(0.37, 0.71)).b,
                            texture2D(uCloudTex, dp + (fl + 1.0) * vec2(0.37, 0.71)).b, smoothstep(0.0, 1.0, fract(ly)));
         // eroded cover drives the cloud height, so small blobs stay low bumps and big cells grow domes
