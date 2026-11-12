@@ -12,7 +12,15 @@ window.addEventListener('keydown', unlock, { capture: true })
 // stop iOS pinch / double-tap zoom and rubber-band scrolling
 document.addEventListener('gesturestart', e => e.preventDefault())
 document.addEventListener('dblclick', e => e.preventDefault())
-document.addEventListener('touchmove', e => e.preventDefault(), { passive: false })
+// ...except inside overlay panels, which must scroll by touch
+document.addEventListener(
+  'touchmove',
+  e => {
+    if (e.target instanceof Element && e.target.closest('[data-scroll]')) return
+    e.preventDefault()
+  },
+  { passive: false },
+)
 
 const application = Runtime.makeApplication({
   Model,

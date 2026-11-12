@@ -392,9 +392,7 @@ const logo = (h: HtmlBuilder<Message>) =>
   )
 
 const titleView = (model: Model, h: HtmlBuilder<Message>): Html =>
-  h.div(
-    [h.Class('overlay overlay-title')],
-    [
+  overlay(h, 'overlay-title', Option.none(), [
       logo(h),
       h.p(
         [h.Class('blurb')],
@@ -413,15 +411,37 @@ const titleView = (model: Model, h: HtmlBuilder<Message>): Html =>
       ),
       h.p([h.Class('best')], [model.best > 0 ? `PERSONAL BEST  ${fmt(model.best)}` : 'NO FLIGHTS LOGGED YET']),
       h.p([h.Class('fineprint')], ['Fan-made homage. Not affiliated with any launch company.']),
-    ],
-  )
+  ])
 
 const keyCap = (h: HtmlBuilder<Message>, k: string) => h.kbd([h.Class('kbd')], [k])
 
-const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
+// Every overlay renders its content in one scrollable panel. When it can be dismissed it also gets
+// a backdrop (a sibling, so taps inside the panel never reach it) and a sticky close button.
+const overlay = (h: HtmlBuilder<Message>, cls: string, maybeClose: Option.Option<Message>, children: ReadonlyArray<Html>): Html =>
   h.div(
-    [h.Class('overlay overlay-howto')],
+    [h.Class(`overlay ${cls}`)],
     [
+      ...Option.match(maybeClose, {
+        onNone: () => [],
+        onSome: close => [h.div([h.Class('overlay-backdrop'), h.OnClick(close)], [])],
+      }),
+      h.div(
+        [h.Class('panel-scroll'), h.DataAttribute('scroll', '')],
+        [
+          ...Option.match(maybeClose, {
+            onNone: () => [],
+            onSome: close => [
+              h.button([h.Class('panel-close'), h.OnClick(close), h.Type('button'), h.AriaLabel('Close')], ['\u2715']),
+            ],
+          }),
+          ...children,
+        ],
+      ),
+    ],
+  )
+
+const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  overlay(h, 'overlay-howto', Option.some(Message.ClickedBackToTitle()), [
       h.h2([h.Class('h2')], ['FLIGHT MANUAL']),
       h.div(
         [h.Class('howto-grid')],
@@ -450,7 +470,7 @@ const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
           h.div(
             [h.Class('howto-card')],
             [
-              h.div([h.Class('keys')], [h.span([h.Class('catch-ico')], ['⫴'])]),
+              h.div([h.Class('keys')], [keyCap(h, 'CATCH')]),
               h.p([], [h.strong([], ['The catch. ']), 'Bring the booster down beside the tower, slow (< 8 m/s), centred (< 5 m), upright (< 8°). Approach from the open side — not through the tower.']),
             ],
           ),
@@ -470,10 +490,9 @@ const howToView = (model: Model, h: HtmlBuilder<Message>): Html =>
         : h.p([h.Class('fineprint')], ['Esc pauses · R restarts · M mutes']),
       h.div(
         [h.Class('row')],
-        [button(h, 'LAUNCH', Message.ClickedLaunch(), true, model.touch ? '' : 'ENTER'), button(h, 'BACK', Message.ClickedBackToTitle())],
+        [button(h, 'LAUNCH', Message.ClickedLaunch(), true, model.touch ? '' : 'ENTER'), button(h, 'BACK', Message.ClickedBackToTitle(), false, model.touch ? '' : 'ESC')],
       ),
-    ],
-  )
+  ])
 
 const resultTitle = (r: Result) =>
   r.kind === 'Caught' ? 'CAUGHT!' : r.kind === 'Touchdown' ? 'TOUCHDOWN' : 'RAPID UNSCHEDULED DISASSEMBLY'
@@ -482,9 +501,7 @@ const resultView = (model: Model, h: HtmlBuilder<Message>): Html =>
   Option.match(model.maybeResult, {
     onNone: () => h.div([], []),
     onSome: r =>
-      h.div(
-        [h.Class(`overlay overlay-result result-${r.kind.toLowerCase()}`)],
-        [
+      overlay(h, `overlay-result result-${r.kind.toLowerCase()}`, Option.some(Message.ClickedBackToTitle()), [
           h.p([h.Class('result-kicker')], [`MISSION ${String(model.attempts).padStart(3, '0')} · T+${formatMet(r.met)}`]),
           h.h2([h.Class('result-title')], [resultTitle(r)]),
           h.p([h.Class('result-reason')], [r.reason]),
@@ -515,8 +532,7 @@ const resultView = (model: Model, h: HtmlBuilder<Message>): Html =>
             [h.Class('row')],
             [button(h, 'FLY AGAIN', Message.ClickedRetry(), true, model.touch ? '' : 'R'), button(h, 'MENU', Message.ClickedBackToTitle(), false, model.touch ? '' : 'ESC')],
           ),
-        ],
-      ),
+      ]),
   })
 
 const scoreRow = (h: HtmlBuilder<Message>, label: string, detail: string, pts: number) =>
@@ -535,16 +551,13 @@ export const formatMet = (met: number) => {
 }
 
 const pausedView = (h: HtmlBuilder<Message>): Html =>
-  h.div(
-    [h.Class('overlay overlay-paused')],
-    [
+  overlay(h, 'overlay-paused', Option.some(Message.ClickedResume()), [
       h.h2([h.Class('h2')], ['HOLD HOLD HOLD']),
       h.div(
         [h.Class('row')],
         [button(h, 'RESUME', Message.ClickedResume(), true), button(h, 'RESTART', Message.ClickedRetry()), button(h, 'MENU', Message.ClickedBackToTitle())],
       ),
-    ],
-  )
+  ])
 
 const topRight = (model: Model, h: HtmlBuilder<Message>) =>
   h.div(

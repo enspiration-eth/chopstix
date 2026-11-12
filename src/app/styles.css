@@ -26,7 +26,6 @@ html, body {
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
-  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -35,7 +34,8 @@ html, body {
 
 #root, .app { position: fixed; inset: 0; }
 
-.stage { position: absolute; inset: 0; }
+.stage { position: absolute; inset: 0; touch-action: none; }
+.hud, .overlay-backdrop { touch-action: none; }
 .game-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 .scrim {
@@ -55,7 +55,26 @@ html, body {
 }
 .overlay-title { justify-content: flex-end; padding-bottom: calc(9vh + var(--safe-b)); background: linear-gradient(to top, rgba(3, 5, 9, 0.85), rgba(3, 5, 9, 0.2) 55%, transparent); }
 .overlay-howto, .overlay-result, .overlay-paused, .overlay-boot { background: rgba(3, 5, 9, 0.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.overlay-howto { overflow-y: auto; justify-content: flex-start; padding-top: calc(32px + var(--safe-t)); pointer-events: auto; touch-action: pan-y; }
+.overlay-backdrop { position: absolute; inset: 0; cursor: pointer; }
+.panel-scroll {
+  position: relative; width: min(100%, 1000px);
+  max-height: 100%;
+  max-height: min(100%, calc(100dvh - 32px - var(--safe-t) - var(--safe-b)));
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  touch-action: pan-y; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  padding: 6px 4px 10px;
+}
+.panel-scroll > * { flex-shrink: 0; }
+.panel-close {
+  position: sticky; top: 0; align-self: flex-start; z-index: 3;
+  width: 40px; height: 40px; margin-bottom: -40px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(5, 7, 11, 0.78); color: var(--ink);
+  font: 18px/1 var(--font); display: grid; place-items: center; cursor: pointer;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+.panel-close:hover { border-color: #fff; background: rgba(255, 122, 47, 0.4); }
+.overlay-howto .panel-scroll, .overlay-result .panel-scroll, .overlay-paused .panel-scroll { padding-left: 48px; padding-right: 48px; }
 
 @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
@@ -292,7 +311,6 @@ html, body {
 @media (max-height: 520px) {
   .overlay { gap: 10px; padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
   .overlay-title { padding-bottom: calc(18px + var(--safe-b)); }
-  .overlay-result, .overlay-paused { overflow-y: auto; justify-content: flex-start; pointer-events: auto; touch-action: pan-y; }
   .logo-mark { display: none; }
   .logo-word { font-size: clamp(40px, 16vh, 72px); }
   .logo-tag { font-size: 10px; }
@@ -310,4 +328,23 @@ html, body {
   .score-pts { font-size: 15px; }
   .score-total { padding-top: 6px; }
   .score-total strong { font-size: 28px; }
+}
+
+/* phones: the flight manual should mostly fit without scrolling */
+@media (max-height: 520px) {
+  .panel-scroll { gap: 10px; max-height: min(100%, calc(100dvh - 24px - var(--safe-t) - var(--safe-b))); }
+  .overlay-howto .panel-scroll, .overlay-result .panel-scroll, .overlay-paused .panel-scroll { padding-left: 44px; padding-right: 44px; }
+  .h2 { font-size: 22px; }
+  .howto-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .howto-card { padding: 8px 10px; }
+  .howto-card p { font-size: 12px; line-height: 1.35; margin-top: 6px; }
+  .kbd { font-size: 15px; min-width: 30px; padding: 4px 7px 2px; }
+  .steps { font-size: 12px; line-height: 1.4; }
+}
+@media (max-width: 520px) {
+  .overlay-howto .panel-scroll, .overlay-result .panel-scroll, .overlay-paused .panel-scroll { padding-left: 4px; padding-right: 4px; }
+  .overlay-howto .h2, .overlay-paused .h2, .result-kicker { margin-top: 44px; }
+  .overlay { padding-left: calc(14px + var(--safe-l)); padding-right: calc(14px + var(--safe-r)); }
+  .howto-grid { grid-template-columns: 1fr; }
+  .score-row { grid-template-columns: 1.3fr 1fr 0.7fr; }
 }
